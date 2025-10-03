@@ -122,10 +122,10 @@ components/ui/
 - Fallback sur Paris (48.8566, 2.3522) si échec
 - Précision élevée pour les signalements
 
-## 📊 Algorithme zones de danger
+## 📊 Algorithme zones de danger (Standalone)
 
 ```javascript
-// Calcul du score de danger pour une zone
+// Calcul du score de danger pour une zone (données locales)
 score = Σ(poids_gravité × weight_timeDecay)
 
 // Pondération par gravité

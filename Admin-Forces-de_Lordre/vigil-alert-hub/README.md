@@ -190,7 +190,7 @@ L'application est entièrement responsive et optimisée pour :
 - **Positions des agents** : Mise à jour automatique
 - **Statut de connexion** : Indicateur visuel
 
-### Backend
+### Backend (Supprimé)
 - **API REST** : Endpoints pour toutes les opérations
 - **Base de données simulée** : Données persistantes
 - **Gestion des agents** : CRUD complet
