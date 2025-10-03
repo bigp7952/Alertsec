@@ -37,7 +37,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Logo } from '@/components/ui/logo'
-import { useApiAuth } from "@/contexts/ApiAuthContext"
+// import { useApiAuth } from "@/contexts/ApiAuthContext"
 import { NotificationIcon } from "@/components/notifications/NotificationCenter"
 
 interface PoliceLayoutProps {
@@ -50,7 +50,21 @@ export function PoliceLayout({ children }: PoliceLayoutProps) {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, logout } = useApiAuth()
+  // const { user, logout } = useApiAuth()
+  
+  // Mock user pour les tests
+  const user = {
+    id: 1,
+    matricule: 'POL001',
+    nom: 'DIOP',
+    prenom: 'Amadou',
+    grade: 'Commissaire',
+    role: 'admin'
+  }
+  
+  const logout = () => {
+    console.log('Logout mocké')
+  }
 
   // Fonction simple pour vérifier les permissions basée sur le rôle
   const hasPermission = (permission: string) => {

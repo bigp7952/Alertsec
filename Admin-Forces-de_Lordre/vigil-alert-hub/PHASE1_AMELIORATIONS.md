@@ -158,3 +158,4 @@ Le dashboard admin est maintenant **parfaitement synchronisé** avec l'applicati
 
 **Prochaine étape** : Phase 2 - Enrichissement de l'Application Mobile Expo
 
+
