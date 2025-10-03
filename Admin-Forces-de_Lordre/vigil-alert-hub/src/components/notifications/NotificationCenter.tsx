@@ -17,9 +17,9 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
-// import { useSupabase } from "@/hooks/useSupabase"
-// import { notificationsService } from "@/lib/supabase"
-// import type { Notification } from "@/lib/supabase"
+import { useSupabase } from "@/hooks/useSupabase"
+import { notificationsService } from "@/lib/supabase"
+import type { Notification } from "@/lib/supabase"
 import {
   AlertDialog,
   AlertDialogAction,
