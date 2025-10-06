@@ -6,6 +6,7 @@ use App\Models\ZoneDanger;
 use App\Models\Signalement;
 use App\Models\User;
 use Illuminate\Http\Request;
+use App\Events\ZoneDangerMiseAJour;
 use Illuminate\Support\Facades\Validator;
 
 class ZoneDangerController extends Controller
@@ -165,6 +166,8 @@ class ZoneDangerController extends Controller
             $zone->calculerNiveauRisque();
             $zone->genererRecommandations();
         }
+
+        try { event(new ZoneDangerMiseAJour($zone)); } catch (\Throwable $e) { }
 
         return response()->json([
             'success' => true,

@@ -13,6 +13,11 @@ use App\Models\Notification;
 use App\Models\Media;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+use App\Events\AgentPositionMiseAJour;
+use App\Events\CommunicationCree;
+use App\Events\NotificationCree;
+use App\Events\SignalementCree;
+use App\Events\SignalementMisAJour;
 
 class ApiController extends Controller
 {
@@ -110,6 +115,9 @@ class ApiController extends Controller
         // Notifier les superviseurs de la mise à jour de position
         $this->notifyLocationUpdate($user, $tracking);
 
+        // Broadcast temps réel
+        try { event(new AgentPositionMiseAJour($tracking)); } catch (\Throwable $e) { }
+
         return response()->json([
             'success' => true,
             'message' => 'Position mise à jour',
@@ -200,6 +208,9 @@ class ApiController extends Controller
         // Notifier les superviseurs
         $this->notifyNewSignalement($signalement);
 
+        // Broadcast création
+        try { event(new SignalementCree($signalement)); } catch (\Throwable $e) { }
+
         return response()->json([
             'success' => true,
             'message' => 'Signalement créé avec succès',
@@ -235,6 +246,9 @@ class ApiController extends Controller
 
         // Notifier le citoyen
         $this->notifySignalementUpdate($signalement);
+
+        // Broadcast mise à jour
+        try { event(new SignalementMisAJour($signalement)); } catch (\Throwable $e) { }
 
         return response()->json([
             'success' => true,
@@ -340,6 +354,9 @@ class ApiController extends Controller
 
         // Notifier le destinataire
         $this->notifyNewMessage($communication, $signalement);
+
+        // Broadcast communication
+        try { event(new CommunicationCree($communication)); } catch (\Throwable $e) { }
 
         return response()->json([
             'success' => true,
