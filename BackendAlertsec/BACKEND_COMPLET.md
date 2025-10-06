@@ -467,3 +467,7 @@ Le backend AlertSec est maintenant **100% fonctionnel** avec :
 
 **Le backend est prêt pour l'intégration avec le dashboard web et l'application mobile Expo !** 🎉
 
+
+
+
+

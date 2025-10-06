@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import apiService, { type User, type Signalement, type AgentTracking, type ZoneDanger, type Notification, type Communication } from '../lib/api';
+import { getEcho } from '@/lib/realtime'
 
 // Hook pour l'authentification
 export const useAuth = () => {
@@ -132,6 +133,19 @@ export const useSignalements = () => {
 
   useEffect(() => {
     fetchSignalements();
+    try {
+      const echo = getEcho()
+      const channel = (echo as any).channel('signalements')
+      channel
+        .listen('SignalementCree', (e: any) => {
+          const s: Signalement = e.signalement
+          setSignalements(prev => [s, ...prev.filter(p => p.id !== s.id)])
+        })
+        .listen('SignalementMisAJour', (e: any) => {
+          const s: Signalement = e.signalement
+          setSignalements(prev => prev.map(p => p.id === s.id ? s : p))
+        })
+    } catch {}
   }, [fetchSignalements]);
 
   return {
@@ -187,10 +201,21 @@ export const useAgentTracking = () => {
 
   useEffect(() => {
     fetchAgents();
-    
-    // Rafraîchir les positions toutes les 30 secondes
+    try {
+      const echo = getEcho()
+      const channel = (echo as any).channel('agents')
+      channel.listen('AgentPositionMiseAJour', (e: any) => {
+        const updated: AgentTracking = e.tracking
+        setPositions(prev => prev.some(p => p.id === updated.id)
+          ? prev.map(p => p.id === updated.id ? updated : p)
+          : [updated, ...prev])
+      })
+    } catch {}
     const interval = setInterval(fetchAgents, 30000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval)
+      try { (getEcho() as any)?.leave?.('agents') } catch {}
+    }
   }, [fetchAgents]);
 
   return {
@@ -239,6 +264,15 @@ export const useDangerZones = () => {
 
   useEffect(() => {
     fetchZones();
+    try {
+      const echo = getEcho()
+      const channel = (echo as any).channel('zones')
+      channel.listen('ZoneDangerMiseAJour', (e: any) => {
+        const z: ZoneDanger = e.zone
+        setZones(prev => prev.map(p => p.id === z.id ? z : p))
+      })
+    } catch {}
+    return () => { try { (getEcho() as any)?.leave?.('zones') } catch {} }
   }, [fetchZones]);
 
   return {
@@ -303,10 +337,19 @@ export const useNotifications = () => {
 
   useEffect(() => {
     fetchNotifications();
-    
-    // Rafraîchir les notifications toutes les minutes
+    try {
+      const echo = getEcho()
+      const channel = (echo as any).channel('notifications')
+      channel.listen('NotificationCree', (e: any) => {
+        setNotifications(prev => [e.notification, ...prev])
+        setUnreadCount(prev => prev + 1)
+      })
+    } catch {}
     const interval = setInterval(fetchNotifications, 60000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval)
+      try { (getEcho() as any)?.leave?.('notifications') } catch {}
+    }
   }, [fetchNotifications]);
 
   return {
@@ -356,6 +399,15 @@ export const useCommunications = (signalementId: number) => {
     if (signalementId) {
       fetchCommunications();
     }
+    try {
+      const echo = getEcho()
+      const channelName = `signalement.${signalementId}`
+      const channel = (echo as any).channel(channelName)
+      channel.listen('CommunicationCree', (e: any) => {
+        setCommunications(prev => [...prev, e.communication])
+      })
+      return () => { try { (getEcho() as any)?.leave?.(channelName) } catch {} }
+    } catch {}
   }, [signalementId, fetchCommunications]);
 
   return {

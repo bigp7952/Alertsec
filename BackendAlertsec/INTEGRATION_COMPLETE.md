@@ -290,3 +290,7 @@ curl -X POST http://localhost:8000/api/mobile/signalements/create \
 
 **🎯 L'écosystème AlertSec est maintenant entièrement connecté et opérationnel !**
 
+
+
+
+

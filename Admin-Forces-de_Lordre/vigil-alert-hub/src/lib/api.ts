@@ -1,5 +1,5 @@
-// Configuration de l'API Laravel
-const API_BASE_URL = 'http://localhost:8000/api';
+// Configuration de l'API Laravel (prend VITE_API_BASE_URL si présent)
+const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
 
 // Interface pour les réponses API
 interface ApiResponse<T> {
@@ -390,9 +390,13 @@ class ApiService {
 
     if (!response.ok) {
       if (response.status === 401) {
-        // Token expiré, déconnecter l'utilisateur
-        this.logout();
-        window.location.href = '/login';
+        try {
+          this.logout();
+        } finally {
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login';
+          }
+        }
         throw new Error('Session expirée');
       }
       throw new Error(`Erreur API: ${response.status}`);

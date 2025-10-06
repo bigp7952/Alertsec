@@ -134,3 +134,7 @@ Response: 200 OK
 
 **Le dashboard est maintenant prêt à être utilisé avec le design original et l'authentification Laravel !** 🚀
 
+
+
+
+

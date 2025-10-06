@@ -125,3 +125,7 @@ onClick={() => window.location.reload()}
 
 **Le dashboard est maintenant entièrement fonctionnel avec l'authentification Laravel !** 🚀
 
+
+
+
+
