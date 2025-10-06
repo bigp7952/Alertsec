@@ -202,6 +202,12 @@ class ApiService {
     return response;
   }
 
+  async deleteSignalement(id: number): Promise<void> {
+    await this.makeRequest<void>(`/signalements/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
   async assignAgent(signalementId: number, agentId: number): Promise<void> {
     await this.makeRequest(`/signalements/${signalementId}/assigner`, {
       method: 'POST',

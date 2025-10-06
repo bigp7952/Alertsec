@@ -32,7 +32,9 @@ export default function SignalementsPage() {
     error: signalementsError,
     fetchSignalements,
     assignAgent,
-    autoAssignAgent 
+    autoAssignAgent,
+    updateSignalement,
+    deleteSignalement,
   } = useSignalements();
 
   const { 
@@ -53,6 +55,24 @@ export default function SignalementsPage() {
       await fetchSignalements();
     } catch (error) {
       console.error('Erreur lors de l\'assignation:', error);
+    }
+  };
+
+  const handleStatusChange = async (signalementId: number, status: 'en cours' | 'traité') => {
+    try {
+      await updateSignalement(signalementId, { status });
+      await fetchSignalements();
+    } catch (error) {
+      console.error('Erreur lors du changement de statut:', error);
+    }
+  };
+
+  const handleDelete = async (signalementId: number) => {
+    try {
+      await deleteSignalement(signalementId);
+      await fetchSignalements();
+    } catch (error) {
+      console.error('Erreur lors de la suppression:', error);
     }
   };
 
@@ -299,6 +319,33 @@ export default function SignalementsPage() {
                     >
                       <User className="h-4 w-4 mr-1" />
                       Assigner
+                    </Button>
+                    )}
+                    {hasPermission('update_status') && signalement.status !== 'en cours' && (
+                    <Button
+                      onClick={() => handleStatusChange(signalement.id, 'en cours')}
+                      variant="secondary"
+                      size="sm"
+                    >
+                      Prendre en charge
+                    </Button>
+                    )}
+                    {hasPermission('update_status') && signalement.status !== 'traité' && (
+                    <Button
+                      onClick={() => handleStatusChange(signalement.id, 'traité')}
+                      variant="outline"
+                      size="sm"
+                    >
+                      Marquer résolu
+                    </Button>
+                    )}
+                    {hasPermission('edit_all') && (
+                    <Button
+                      onClick={() => handleDelete(signalement.id)}
+                      variant="destructive"
+                      size="sm"
+                    >
+                      Supprimer
                     </Button>
                     )}
                   </div>

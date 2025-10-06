@@ -109,6 +109,17 @@ export const useSignalements = () => {
     }
   }, []);
 
+  const deleteSignalement = useCallback(async (id: number) => {
+    try {
+      await apiService.deleteSignalement(id);
+      setSignalements(prev => prev.filter(s => s.id !== id));
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la suppression du signalement';
+      setError(errorMessage);
+      throw err;
+    }
+  }, []);
+
   const assignAgent = useCallback(async (signalementId: number, agentId: number) => {
     try {
       await apiService.assignAgent(signalementId, agentId);
@@ -155,6 +166,7 @@ export const useSignalements = () => {
     fetchSignalements,
     createSignalement,
     updateSignalement,
+    deleteSignalement,
     assignAgent,
     autoAssignAgent,
   };
