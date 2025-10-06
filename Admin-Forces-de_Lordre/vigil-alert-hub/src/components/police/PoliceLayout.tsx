@@ -37,7 +37,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Logo } from '@/components/ui/logo'
-import { useApiAuth } from "@/contexts/ApiAuthContext"
+import { useAuth } from "@/contexts/AuthContext"
 import { NotificationIcon } from "@/components/notifications/NotificationCenter"
 
 interface PoliceLayoutProps {
@@ -50,16 +50,14 @@ export function PoliceLayout({ children }: PoliceLayoutProps) {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, logout } = useApiAuth()
+  const { user, logout, hasPermission } = useAuth()
 
   // Fonction simple pour vérifier les permissions basée sur le rôle
-  const hasPermission = (permission: string) => {
-    if (!user) return false;
-    // Pour simplifier, on autorise tous les accès pour l'admin
-    if (user.role === 'admin') return true;
-    // Logique basique pour les autres rôles
-    return true; // Temporairement, on autorise tout
-  };
+  // Permissions via AuthContext
+  const hasPermissionLocal = (permission: string | null) => {
+    if (!permission) return true
+    return hasPermission(permission)
+  }
 
   const navigationItems = [
     { 

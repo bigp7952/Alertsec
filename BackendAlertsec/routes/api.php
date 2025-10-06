@@ -186,6 +186,26 @@ Route::middleware(['auth:sanctum', 'user.status'])->group(function () {
             ->middleware('role:admin');
     });
 
+    // Utilisateurs forces (agents) - pour assignation
+    Route::get('utilisateurs/forces', function () {
+        $agents = \App\Models\User::where('role', 'agent')
+            ->where('statut', 'actif')
+            ->select('id','prenom','nom','grade','unite','secteur','role','experience','charge_travail','distance_max')
+            ->orderBy('prenom')
+            ->get();
+        return response()->json(['success' => true, 'data' => $agents]);
+    });
+
+    // Feedbacks des citoyens (placeholder si modèle absent)
+    Route::get('feedbacks', function () {
+        // Si vous avez un modèle Feedback, remplacez par la requête modèle
+        $feedbacks = \App\Models\Communication::select('id','signalement_id','user_id','type','contenu','created_at')
+            ->orderBy('created_at','desc')
+            ->limit(100)
+            ->get();
+        return response()->json(['success' => true, 'data' => $feedbacks]);
+    });
+
     // Gestion des utilisateurs (admin uniquement)
     Route::prefix('users')->middleware('role:admin')->group(function () {
         Route::get('/', function () {

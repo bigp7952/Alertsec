@@ -4,6 +4,7 @@ import { Navigate } from 'react-router-dom'
 import { AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AuthService, type User, type LoginCredentials } from '@/lib/auth-service'
+import apiService from '@/lib/api'
 
 interface AuthState {
   user: User | null
@@ -105,8 +106,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setAuthState(prev => ({ ...prev, isLoading: true }))
       
-      // Utiliser le service d'authentification Supabase
-      const result = await AuthService.login(credentials)
+      // Tenter d'abord le backend Laravel
+      try {
+        const res = await apiService.login(credentials.matricule, credentials.motDePasse)
+        // Sauvegarder token utilisateur backend
+        localStorage.setItem('auth_token', res.token)
+        localStorage.setItem('user', JSON.stringify(res.user))
+        // Session prolongée locale
+        const sessionExpiry = Date.now() + (8 * 60 * 60 * 1000)
+        localStorage.setItem('police_session', JSON.stringify(res.user))
+        localStorage.setItem('police_session_expiry', sessionExpiry.toString())
+        setAuthState({ user: res.user as unknown as User, isAuthenticated: true, isLoading: false, sessionExpiry })
+        toast({ title: 'Connexion réussie', description: `Bienvenue ${res.user.prenom} ${res.user.nom}` })
+        return true
+      } catch (e) {
+        // Fallback mock si backend KO
+        const result = await AuthService.login(credentials)
       
       if (!result.success || !result.user) {
         toast({
@@ -137,6 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       
       return true
+      }
       
     } catch (error) {
       console.error('Erreur de connexion:', error)

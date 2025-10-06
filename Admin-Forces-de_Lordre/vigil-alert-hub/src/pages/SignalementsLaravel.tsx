@@ -13,9 +13,11 @@ import { AgentTracker } from '@/components/tracking/AgentTracker';
 import { DangerZones } from '@/components/zones/DangerZones';
 import { CreateSignalementForm } from '@/components/forms/CreateSignalementForm';
 import { useSignalements, useAgentTracking } from '@/hooks/useApi';
+import { useAuth } from '@/contexts/AuthContext'
 import { type Signalement, type User } from '@/lib/api';
 
 export default function SignalementsPage() {
+  const { hasPermission } = useAuth()
   const [selectedSignalement, setSelectedSignalement] = useState<Signalement | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -151,10 +153,12 @@ export default function SignalementsPage() {
           <h1 className="text-3xl font-bold">Signalements</h1>
           <p className="text-gray-600">Gestion des signalements et assignation des agents</p>
         </div>
+        {hasPermission('edit_signalements') && (
         <Button onClick={() => setShowCreateForm(true)} className="bg-blue-600 hover:bg-blue-700">
           <Plus className="h-4 w-4 mr-2" />
           Nouveau signalement
         </Button>
+        )}
       </div>
 
       {/* Filtres et recherche */}
@@ -273,6 +277,7 @@ export default function SignalementsPage() {
                   </div>
 
                   <div className="flex flex-col space-y-2">
+                    {hasPermission('view_signalements') && (
                     <Button
                       onClick={() => {
                         setSelectedSignalement(signalement);
@@ -284,6 +289,8 @@ export default function SignalementsPage() {
                       <Eye className="h-4 w-4 mr-1" />
                       Détails
                     </Button>
+                    )}
+                    {hasPermission('assign_agents') && (
                     <Button
                       onClick={() => handleAssignAgent(signalement.id)}
                       variant="default"
@@ -293,6 +300,7 @@ export default function SignalementsPage() {
                       <User className="h-4 w-4 mr-1" />
                       Assigner
                     </Button>
+                    )}
                   </div>
                 </div>
               </CardContent>

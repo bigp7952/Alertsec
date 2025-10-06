@@ -217,7 +217,15 @@ class ApiService {
 
   // Méthodes pour les agents
   async getAgents(): Promise<User[]> {
-    const response = await this.makeRequest<User[]>('/agents');
+    // Préférence: endpoint dédié à la liste des forces pour assignation
+    try {
+      const response = await this.makeRequest<User[]>('/utilisateurs/forces');
+      return response;
+    } catch {
+      // Fallback sur /agents si indisponible
+      const response = await this.makeRequest<User[]>('/agents');
+      return response;
+    }
     return response;
   }
 
@@ -251,6 +259,11 @@ class ApiService {
   // Méthodes pour les zones de danger
   async getDangerZones(): Promise<ZoneDanger[]> {
     const response = await this.makeRequest<ZoneDanger[]>('/zones');
+    return response;
+  }
+
+  async getFeedbacks(): Promise<any[]> {
+    const response = await this.makeRequest<any[]>('/feedbacks');
     return response;
   }
 
