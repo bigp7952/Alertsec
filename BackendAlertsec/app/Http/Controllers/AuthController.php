@@ -14,8 +14,9 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'email' => 'required|email',
+            'matricule' => 'required|string',
             'password' => 'required|string',
+            'code_service' => 'nullable|string',
             'device_name' => 'nullable|string',
         ]);
 
@@ -27,7 +28,7 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $user = User::where('email', $request->email)->first();
+        $user = User::where('matricule', $request->matricule)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
@@ -296,6 +297,8 @@ class AuthController extends Controller
         ]);
     }
 }
+
+
 
 
 

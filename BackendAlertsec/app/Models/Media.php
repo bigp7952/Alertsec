@@ -9,6 +9,13 @@ use Illuminate\Support\Facades\Storage;
 class Media extends Model
 {
     use HasFactory;
+    
+    // Le nom de table réel est "medias" (et non l'irrégulier "media")
+    protected $table = 'medias';
+
+    protected $appends = [
+        'url',
+    ];
 
     protected $fillable = [
         'signalement_id',
@@ -104,6 +111,7 @@ class Media extends Model
         ]);
     }
 }
+
 
 
 

@@ -1,8 +1,9 @@
 import { PrimaryButton } from '@/components/ui/buttons';
 import { SignalementCard } from '@/components/ui/cards';
+import { useApi } from '@/contexts/ApiContext';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
 // Données de démonstration
@@ -37,17 +38,25 @@ const DEMO_SIGNALEMENTS = [
 ];
 
 export default function SignalementsScreen() {
-  const [signalements] = useState(DEMO_SIGNALEMENTS);
+  const { signalements, fetchCitizenSignalements, signalementsLoading } = useApi();
   const [filter, setFilter] = useState<'tous' | 'en_cours' | 'resolu'>('tous');
+
+  useEffect(() => {
+    fetchCitizenSignalements();
+  }, []);
 
   const filteredSignalements = signalements.filter(signalement => {
     if (filter === 'tous') return true;
-    return signalement.status === filter;
+    if (filter === 'en_cours') return signalement.status === 'en cours';
+    if (filter === 'resolu') return signalement.status === 'traité';
+    return true;
   });
 
   const getFilterCount = (filterType: 'tous' | 'en_cours' | 'resolu') => {
     if (filterType === 'tous') return signalements.length;
-    return signalements.filter(s => s.status === filterType).length;
+    if (filterType === 'en_cours') return signalements.filter(s => s.status === 'en cours').length;
+    if (filterType === 'resolu') return signalements.filter(s => s.status === 'traité').length;
+    return 0;
   };
 
   return (
@@ -120,11 +129,21 @@ export default function SignalementsScreen() {
 
       {/* Liste des signalements */}
       <ScrollView className="flex-1 px-4 pt-4">
-        {filteredSignalements.length > 0 ? (
+        {signalementsLoading ? (
+          <View className="flex-1 justify-center items-center py-20">
+            <Text className="text-lg text-neutral-600">Chargement...</Text>
+          </View>
+        ) : filteredSignalements.length > 0 ? (
           filteredSignalements.map((signalement) => (
             <SignalementCard
               key={signalement.id}
-              {...signalement}
+              id={signalement.id.toString()}
+              type={signalement.type}
+              description={signalement.description}
+              gravite={signalement.priorite === 'critique' ? 'critique' : signalement.priorite === 'haute' ? 'moyen' : 'mineur'}
+              location={signalement.adresse}
+              timestamp={new Date(signalement.date_signalement).toLocaleDateString()}
+              status={signalement.status === 'en cours' ? 'en_cours' : signalement.status === 'traité' ? 'resolu' : 'en_cours'}
               onPress={() => {
                 // Navigation vers détail du signalement
                 console.log('Voir détail:', signalement.id);

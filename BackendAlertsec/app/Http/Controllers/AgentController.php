@@ -14,6 +14,11 @@ class AgentController extends Controller
     {
         $query = User::agents()->with(['dernierePosition']);
 
+        // Filtrage par secteur pour les superviseurs
+        if ($request->filled('secteur_filter')) {
+            $query->where('secteur', $request->secteur_filter);
+        }
+
         // Filtres
         if ($request->filled('secteur')) {
             $query->where('secteur', $request->secteur);
@@ -33,12 +38,72 @@ class AgentController extends Controller
             }
         }
 
-        $agents = $query->paginate($request->get('per_page', 15));
+        try {
+            $agents = $query->orderBy('prenom')->get();
+
+            $normalized = $agents->map(function ($u) {
+                $u->statut = $u->statut ?? 'actif';
+                return $u;
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => $normalized
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error('Erreur index agents: '.$e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors du chargement des agents'
+            ], 500);
+        }
+    }
+
+    public function store(Request $request)
+    {
+        $this->authorizeAdmin($request->user());
+
+        $validator = Validator::make($request->all(), [
+            'matricule' => 'required|string|max:50|unique:users,matricule',
+            'prenom' => 'required|string|max:255',
+            'nom' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+            'telephone' => 'nullable|string|max:255',
+            'adresse' => 'nullable|string|max:500',
+            'grade' => 'required|string|max:255',
+            'unite' => 'required|string|max:255',
+            'secteur' => 'required|string|max:255',
+            'password' => 'required|string|min:6',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Données invalides',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $agent = User::create([
+            'matricule' => $request->matricule,
+            'prenom' => $request->prenom,
+            'nom' => $request->nom,
+            'email' => $request->email,
+            'telephone' => $request->telephone,
+            'adresse' => $request->adresse,
+            'grade' => $request->grade,
+            'unite' => $request->unite,
+            'secteur' => $request->secteur,
+            'role' => 'agent',
+            'password' => bcrypt($request->password),
+            'statut' => 'actif',
+        ]);
 
         return response()->json([
             'success' => true,
-            'data' => $agents
-        ]);
+            'message' => 'Agent créé',
+            'data' => $agent
+        ], 201);
     }
 
     public function show($id)
@@ -300,6 +365,27 @@ class AgentController extends Controller
         ]);
     }
 
+    public function destroy($id)
+    {
+        $agent = User::findOrFail($id);
+
+        // Empêcher la suppression d'un administrateur
+        if ($agent->role === 'admin') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Impossible de supprimer un administrateur'
+            ], 403);
+        }
+
+        // Supprimer l'utilisateur
+        $agent->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Utilisateur supprimé'
+        ]);
+    }
+
     public function updateAgent(Request $request, $id)
     {
         $agent = User::agents()->findOrFail($id);
@@ -314,6 +400,11 @@ class AgentController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
+            'prenom' => 'sometimes|string|max:255',
+            'nom' => 'sometimes|string|max:255',
+            'email' => 'sometimes|email|max:255',
+            'telephone' => 'sometimes|string|max:255',
+            'adresse' => 'sometimes|string|max:500',
             'grade' => 'sometimes|string|max:255',
             'unite' => 'sometimes|string|max:255',
             'secteur' => 'sometimes|string|max:255',
@@ -332,7 +423,8 @@ class AgentController extends Controller
         }
 
         $agent->update($request->only([
-            'grade', 'unite', 'secteur', 'specialites', 
+            'prenom', 'nom', 'email', 'telephone', 'adresse',
+            'grade', 'unite', 'secteur', 'specialites',
             'experience', 'distance_max', 'statut'
         ]));
 
@@ -405,6 +497,13 @@ class AgentController extends Controller
         }
 
         return $evolution;
+    }
+
+    private function authorizeAdmin($user)
+    {
+        if (!$user || !$user->isAdmin()) {
+            abort(403, 'Non autorisé');
+        }
     }
 }
 

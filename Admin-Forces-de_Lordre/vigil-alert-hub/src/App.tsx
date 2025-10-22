@@ -2,10 +2,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { ApiAuthProvider } from "@/contexts/ApiAuthContext";
+import { AuthProvider, ProtectedRoute } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
-import AuthWrapper from "@/components/auth/AuthWrapper";
-import LoginForm from "@/components/auth/LoginForm";
+import Login from "./pages/Login";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Signalements from "./pages/Signalements";
@@ -22,68 +21,72 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <BrowserRouter>
-        <ApiAuthProvider>
+        <AuthProvider>
           <NotificationProvider>
             <Routes>
               {/* Route publique de connexion */}
-              <Route path="/login" element={<LoginForm />} />
+              <Route path="/login" element={<Login />} />
               
               {/* Routes protégées */}
               <Route path="/" element={
-                <AuthWrapper>
-                  <Index />
-                </AuthWrapper>
+                <ProtectedRoute>
+                  <PoliceLayout>
+                    <Index />
+                  </PoliceLayout>
+                </ProtectedRoute>
               } />
               
               <Route path="/historique" element={
-                <AuthWrapper>
+                <ProtectedRoute>
                   <PoliceLayout>
                     <Historique />
                   </PoliceLayout>
-                </AuthWrapper>
+                </ProtectedRoute>
               } />
               
               <Route path="/signalements" element={
-                <AuthWrapper>
+                <ProtectedRoute>
                   <PoliceLayout>
                     <Signalements />
                   </PoliceLayout>
-                </AuthWrapper>
+                </ProtectedRoute>
               } />
               
               <Route path="/cas-graves" element={
-                <AuthWrapper>
+                <ProtectedRoute>
                   <PoliceLayout>
                     <CasGraves />
                   </PoliceLayout>
-                </AuthWrapper>
+                </ProtectedRoute>
               } />
               
               <Route path="/utilisateurs" element={
-                <AuthWrapper>
+                <ProtectedRoute>
                   <PoliceLayout>
                     <Utilisateurs />
                   </PoliceLayout>
-                </AuthWrapper>
+                </ProtectedRoute>
               } />
               
               <Route path="/feedbacks" element={
-                <AuthWrapper>
+                <ProtectedRoute>
                   <PoliceLayout>
                     <Feedbacks />
                   </PoliceLayout>
-                </AuthWrapper>
+                </ProtectedRoute>
               } />
               
               {/* Route 404 protégée */}
               <Route path="*" element={
-                <AuthWrapper>
-                  <NotFound />
-                </AuthWrapper>
+                <ProtectedRoute>
+                  <PoliceLayout>
+                    <NotFound />
+                  </PoliceLayout>
+                </ProtectedRoute>
               } />
             </Routes>
           </NotificationProvider>
-        </ApiAuthProvider>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

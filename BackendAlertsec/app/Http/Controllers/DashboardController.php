@@ -429,7 +429,94 @@ class DashboardController extends Controller
             ];
         });
     }
+
+    /**
+     * Statistiques par superviseur (admin uniquement)
+     */
+    public function getSuperviseursStats(Request $request)
+    {
+        $superviseurs = User::where('role', 'superviseur')->get();
+        
+        $stats = $superviseurs->map(function ($superviseur) {
+            // Agents sous sa responsabilité
+            $agents = User::agents()->where('secteur', $superviseur->secteur)->get();
+            
+            // Signalements de son secteur
+            $signalements = Signalement::whereHas('citoyen', function($q) use ($superviseur) {
+                $q->where('secteur', $superviseur->secteur);
+            })->orWhereHas('agentAssigne', function($q) use ($superviseur) {
+                $q->where('secteur', $superviseur->secteur);
+            })->get();
+            
+            // Zones de son secteur
+            $zones = ZoneDanger::where('secteur', $superviseur->secteur)->get();
+            
+            return [
+                'superviseur' => [
+                    'id' => $superviseur->id,
+                    'matricule' => $superviseur->matricule,
+                    'nom_complet' => $superviseur->nom_complet,
+                    'grade' => $superviseur->grade,
+                    'secteur' => $superviseur->secteur,
+                    'unite' => $superviseur->unite,
+                    'derniere_connexion' => $superviseur->derniere_connexion,
+                ],
+                'effectif' => [
+                    'total_agents' => $agents->count(),
+                    'agents_actifs' => $agents->where('statut', 'actif')->count(),
+                    'agents_disponibles' => $agents->where('statut', 'actif')->where('charge_travail', '<', 5)->count(),
+                    'agents_en_mission' => $agents->where('charge_travail', '>', 0)->count(),
+                ],
+                'performance' => [
+                    'signalements_total' => $signalements->count(),
+                    'signalements_traites' => $signalements->where('status', 'traité')->count(),
+                    'signalements_en_cours' => $signalements->where('status', 'en_cours')->count(),
+                    'signalements_critiques' => $signalements->where('niveau', 'danger-critical')->count(),
+                    'taux_traitement' => $signalements->count() > 0 ? 
+                        round(($signalements->where('status', 'traité')->count() / $signalements->count()) * 100, 2) : 0,
+                    'temps_moyen_intervention' => $agents->avg('temps_moyen_intervention'),
+                    'taux_reussite_moyen' => $agents->avg('taux_reussite'),
+                ],
+                'zones' => [
+                    'total_zones' => $zones->count(),
+                    'zones_critiques' => $zones->where('niveau_risque', '>=', 80)->count(),
+                    'niveau_risque_moyen' => $zones->avg('niveau_risque'),
+                ],
+                'alertes' => [
+                    'signalements_non_traites' => $signalements->where('status', '!=', 'traité')->count(),
+                    'agents_surcharges' => $agents->where('charge_travail', '>=', 4)->count(),
+                    'zones_risque_eleve' => $zones->where('niveau_risque', '>=', 70)->count(),
+                ]
+            ];
+        });
+
+        // Statistiques globales
+        $statsGlobales = [
+            'total_superviseurs' => $superviseurs->count(),
+            'secteurs_couverts' => $superviseurs->pluck('secteur')->unique()->count(),
+            'performance_globale' => [
+                'taux_traitement_moyen' => $stats->avg('performance.taux_traitement'),
+                'temps_intervention_moyen' => $stats->avg('performance.temps_moyen_intervention'),
+                'taux_reussite_moyen' => $stats->avg('performance.taux_reussite_moyen'),
+            ],
+            'alertes_globales' => [
+                'superviseurs_inactifs' => $superviseurs->where('derniere_connexion', '<', now()->subHours(24))->count(),
+                'secteurs_surcharges' => $stats->where('alertes.signalements_non_traites', '>', 10)->count(),
+                'secteurs_risque' => $stats->where('alertes.zones_risque_eleve', '>', 0)->count(),
+            ]
+        ];
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'superviseurs' => $stats,
+                'statistiques_globales' => $statsGlobales
+            ]
+        ]);
+    }
 }
+
+
 
 
 

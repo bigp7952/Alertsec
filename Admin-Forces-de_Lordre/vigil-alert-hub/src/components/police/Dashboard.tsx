@@ -11,8 +11,8 @@ import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useNavigate } from "react-router-dom"
 import InteractiveMap from "@/components/map/InteractiveMap"
-import { useSupabase } from "@/hooks/useSupabase"
-import { statsService } from "@/lib/supabase"
+import apiService, { type Signalement, type User } from "@/lib/api"
+import { useAuth } from "@/contexts/AuthContext"
 import { 
   Dialog, 
   DialogContent, 
@@ -34,13 +34,12 @@ import {
 } from "@/components/ui/alert-dialog"
 
 // Composant pour les détails d'activité
-function ActivityDetailDialog({ activity }: { activity: any }) {
+function ActivityDetailDialog({ activity, agentsData }: { activity: any, agentsData: User[] }) {
   const { toast } = useToast()
   const navigate = useNavigate()
   const [isAssigning, setIsAssigning] = useState(false)
   const [selectedAgent, setSelectedAgent] = useState("")
   const [notes, setNotes] = useState("")
-  const { agents, assignerAgent } = useSupabase()
 
   const handleTakeCharge = async () => {
     if (!selectedAgent) {
@@ -56,17 +55,23 @@ function ActivityDetailDialog({ activity }: { activity: any }) {
     
     try {
       const agentId = parseInt(selectedAgent)
-      await assignerAgent(activity.id, agentId)
+      // Assignation réelle via l'API
+      await apiService.assignAgent(activity.id, agentId)
       
       toast({
         title: "Prise en charge confirmée",
         description: `Agent assigné au signalement "${activity.message}"`,
       })
       
-    } catch (error) {
+      // Mise à jour de l'activité
+      activity.status = "en cours"
+      const selectedAgentData = agentsData.find(a => a.id === agentId)
+      activity.agent = selectedAgentData ? `${selectedAgentData.prenom} ${selectedAgentData.nom}` : "Agent assigné"
+      
+    } catch (error: any) {
       toast({
         title: "Erreur",
-        description: "Impossible d'assigner l'agent",
+        description: error.message || "Impossible d'assigner l'agent",
         variant: "destructive"
       })
     } finally {
@@ -89,7 +94,7 @@ function ActivityDetailDialog({ activity }: { activity: any }) {
     })
   }
 
-  const availableAgents = agents.filter(agent => agent.status === 'disponible')
+  const availableAgents = agentsData.filter(agent => agent.statut === 'actif')
 
   return (
     <>
@@ -247,12 +252,16 @@ export function Dashboard() {
     agentsDisponibles: 0,
     tauxResolution: 0
   })
-  const [statsParJour, setStatsParJour] = useState([])
+  const [statsParJour, setStatsParJour] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   
   const { toast } = useToast()
   const navigate = useNavigate()
-  const { isConnected, signalements, agents, notifications } = useSupabase()
+  const { user } = useAuth()
+  const [signalementsData, setSignalementsData] = useState<Signalement[]>([])
+  const [agentsData, setAgentsData] = useState<User[]>([])
+  const [superviseursStats, setSuperviseursStats] = useState<any>(null)
+  const isConnected = true
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000)
@@ -260,29 +269,75 @@ export function Dashboard() {
   }, [])
 
   useEffect(() => {
-    const loadStats = async () => {
+    const load = async () => {
       try {
         setIsLoading(true)
-        const [statsData, statsJourData] = await Promise.all([
-          statsService.getStats(),
-          statsService.getStatsParJour()
-        ])
-        setStats(statsData)
-        setStatsParJour(statsJourData)
-      } catch (error) {
-        console.error('Erreur lors du chargement des statistiques:', error)
-        toast({
-          title: "Erreur",
-          description: "Impossible de charger les statistiques",
-          variant: "destructive"
+        const promises = [
+          apiService.getSignalements().catch(() => []),
+          apiService.getAgents().catch(() => []),
+          apiService.getSignalementsStats().catch(() => ({} as any)),
+        ]
+        
+        // Si admin, charger aussi les stats des superviseurs
+        if (user?.role === 'admin') {
+          promises.push(apiService.getSuperviseursStats().catch(() => null))
+        }
+        
+        const results = await Promise.all(promises)
+        const [sig, ag, sigStats, supStats] = results
+        
+        setSignalementsData(sig as any)
+        setAgentsData(ag as any)
+        if (supStats) setSuperviseursStats(supStats)
+        
+        const total = Array.isArray(sig) ? sig.length : 0
+        const critiques = Array.isArray(sig) ? (sig as any[]).filter(s => s.niveau === 'danger-critical').length : 0
+        // Agents disponibles: ceux qui ne sont pas inactifs
+        const disponibles = Array.isArray(ag) ? (ag as any[]).filter(a => (a.statut ?? 'actif') !== 'inactif').length : 0
+        const taux = typeof sigStats?.taux_traitement === 'number' ? sigStats.taux_traitement : (sigStats?.tauxResolution ?? 0)
+        
+        setStats({
+          totalSignalements: total,
+          signalementsCritiques: critiques,
+          agentsDisponibles: disponibles,
+          tauxResolution: taux || 0,
         })
+        // stats par jour - utiliser les vraies données ou générer un fallback basé sur les signalements
+        if (sigStats?.par_jour && Array.isArray(sigStats.par_jour)) {
+          setStatsParJour(sigStats.par_jour.map((d: any) => ({ date: d.date, signalements: d.total, traites: d.traites || 0 })))
+        } else {
+          // Fallback: générer des données basées sur les signalements réels
+          const last7Days = Array.from({ length: 7 }, (_, i) => {
+            const date = new Date()
+            date.setDate(date.getDate() - i)
+            const dateStr = date.toISOString().split('T')[0]
+            
+            // Compter les signalements pour cette date
+            const signalementsDuJour = Array.isArray(sig) ? (sig as any[]).filter(s => {
+              const signalementDate = new Date(s.date_signalement).toISOString().split('T')[0]
+              return signalementDate === dateStr
+            }) : []
+            
+            const traitesDuJour = signalementsDuJour.filter(s => s.status === 'traité').length
+            
+            return {
+              date: date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }),
+              signalements: signalementsDuJour.length,
+              traites: traitesDuJour
+            }
+          }).reverse()
+          
+          setStatsParJour(last7Days)
+        }
+      } catch (error) {
+        console.error('Erreur chargement stats:', error)
+        toast({ title: "Erreur", description: "Impossible de charger les statistiques", variant: "destructive" })
       } finally {
         setIsLoading(false)
       }
     }
-
-    loadStats()
-  }, [toast])
+    load()
+  }, [toast, user])
 
   // Fonction pour gérer l'affichage des détails d'une activité
   const handleViewActivity = (activity: any) => {
@@ -306,20 +361,20 @@ export function Dashboard() {
   }
 
   // Convertir les signalements en format d'activité
-  const recentActivity = signalements.slice(0, 3).map(signalement => ({
+  const recentActivity = (signalementsData || []).slice(0, 3).map((signalement: any) => ({
     id: signalement.id,
     type: signalement.niveau === 'danger-critical' ? 'critical' : 
           signalement.niveau === 'danger-medium' ? 'medium' : 'safe',
     message: signalement.description,
-    time: new Date(signalement.created_at).toLocaleTimeString('fr-FR', { 
+    time: (signalement.heure || new Date(signalement.date_signalement).toLocaleTimeString('fr-FR', { 
       hour: '2-digit', 
       minute: '2-digit' 
-    }),
-    location: signalement.localisation.nom,
+    })),
+    location: signalement.adresse || `${signalement.latitude ?? ''}, ${signalement.longitude ?? ''}`,
     details: signalement.description,
-    reporter: signalement.citoyen,
+    reporter: `${signalement?.citoyen?.prenom ?? ''} ${signalement?.citoyen?.nom ?? ''}`.trim(),
     status: signalement.status,
-    agent: signalement.agent_assigne
+    agent: `${signalement?.agent_assigne?.prenom ?? ''} ${signalement?.agent_assigne?.nom ?? ''}`.trim()
   }))
 
   return (
@@ -344,12 +399,29 @@ export function Dashboard() {
         </div>
       </div>
 
+      {/* Indicateur de secteur pour superviseurs */}
+      {user?.role === 'superviseur' && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+          <div className="flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-blue-600" />
+            <span className="text-sm font-medium text-blue-800">
+              Vue sectorielle : {user.secteur}
+            </span>
+          </div>
+          <p className="text-xs text-blue-600 mt-1">
+            Vous ne voyez que les données de votre secteur
+          </p>
+        </div>
+      )}
+
       {/* Statistiques principales - plus compactes */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="hover:scale-105 transition-transform duration-200">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-xs text-muted-foreground">Signalements</CardTitle>
+              <CardTitle className="text-xs text-muted-foreground">
+                {user?.role === 'superviseur' ? 'Signalements (secteur)' : 'Signalements'}
+              </CardTitle>
               <AlertTriangle className="h-3 w-3 text-primary" />
             </div>
           </CardHeader>
@@ -358,7 +430,9 @@ export function Dashboard() {
               <span className="text-xl font-bold text-foreground">
                 {isLoading ? "..." : stats.totalSignalements}
               </span>
-              <Badge variant="success" className="text-2xs">+5</Badge>
+              <Badge variant="success" className="text-2xs">
+                {stats.totalSignalements > 0 ? `+${Math.floor(stats.totalSignalements * 0.1)}` : "0"}
+              </Badge>
             </div>
           </CardContent>
         </Card>
@@ -375,7 +449,9 @@ export function Dashboard() {
               <span className="text-xl font-bold text-danger-critical">
                 {isLoading ? "..." : stats.signalementsCritiques}
               </span>
-              <Badge variant="warning" className="text-2xs">urgent</Badge>
+              <Badge variant={stats.signalementsCritiques > 0 ? "destructive" : "success"} className="text-2xs">
+                {stats.signalementsCritiques > 0 ? "urgent" : "stable"}
+              </Badge>
             </div>
           </CardContent>
         </Card>
@@ -392,7 +468,7 @@ export function Dashboard() {
               <span className="text-xl font-bold text-foreground">
                 {isLoading ? "..." : stats.agentsDisponibles}
               </span>
-              <Badge variant="outline" className="text-2xs">/ {agents.length}</Badge>
+              <Badge variant="outline" className="text-2xs">/ {agentsData.length}</Badge>
             </div>
           </CardContent>
         </Card>
@@ -409,11 +485,57 @@ export function Dashboard() {
               <span className="text-xl font-bold text-safe-zone">
                 {isLoading ? "..." : `${stats.tauxResolution}%`}
               </span>
-              <Badge variant="success" className="text-2xs">+3%</Badge>
+              <Badge variant={stats.tauxResolution >= 80 ? "success" : stats.tauxResolution >= 60 ? "warning" : "destructive"} className="text-2xs">
+                {stats.tauxResolution >= 80 ? "excellent" : stats.tauxResolution >= 60 ? "correct" : "faible"}
+              </Badge>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Section superviseurs pour admin */}
+      {user?.role === 'admin' && superviseursStats && (
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Performance des Superviseurs
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {superviseursStats.superviseurs?.map((sup: any) => (
+                <div key={sup.superviseur.id} className="p-3 border rounded-lg bg-gray-50">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-medium text-sm">{sup.superviseur.nom_complet}</h4>
+                    <Badge variant="outline" className="text-xs">{sup.superviseur.secteur}</Badge>
+                  </div>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span>Agents:</span>
+                      <span className="font-medium">{sup.effectif.total_agents}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Signalements:</span>
+                      <span className="font-medium">{sup.performance.signalements_total}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Taux traitement:</span>
+                      <span className="font-medium text-green-600">{sup.performance.taux_traitement}%</span>
+                    </div>
+                    {sup.alertes.signalements_non_traites > 0 && (
+                      <div className="flex justify-between text-red-600">
+                        <span>En attente:</span>
+                        <span className="font-medium">{sup.alertes.signalements_non_traites}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Graphiques et carte */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -453,9 +575,9 @@ export function Dashboard() {
               <PieChart>
                 <Pie
                   data={[
-                    { name: "Critiques", value: signalements.filter(s => s.niveau === 'danger-critical').length, color: "#DC2626" },
-                    { name: "Moyens", value: signalements.filter(s => s.niveau === 'danger-medium').length, color: "#F59E0B" },
-                    { name: "Sécurisés", value: signalements.filter(s => s.niveau === 'safe-zone').length, color: "#10B981" },
+                    { name: "Critiques", value: signalementsData.filter(s => s.niveau === 'danger-critical').length, color: "#DC2626" },
+                    { name: "Moyens", value: signalementsData.filter(s => s.niveau === 'danger-medium').length, color: "#F59E0B" },
+                    { name: "Sécurisés", value: signalementsData.filter(s => s.niveau === 'safe-zone').length, color: "#10B981" },
                   ]}
                   cx="50%"
                   cy="50%"
@@ -465,9 +587,9 @@ export function Dashboard() {
                   dataKey="value"
                 >
                   {[
-                    { name: "Critiques", value: signalements.filter(s => s.niveau === 'danger-critical').length, color: "#DC2626" },
-                    { name: "Moyens", value: signalements.filter(s => s.niveau === 'danger-medium').length, color: "#F59E0B" },
-                    { name: "Sécurisés", value: signalements.filter(s => s.niveau === 'safe-zone').length, color: "#10B981" },
+                    { name: "Critiques", value: signalementsData.filter(s => s.niveau === 'danger-critical').length, color: "#DC2626" },
+                    { name: "Moyens", value: signalementsData.filter(s => s.niveau === 'danger-medium').length, color: "#F59E0B" },
+                    { name: "Sécurisés", value: signalementsData.filter(s => s.niveau === 'safe-zone').length, color: "#10B981" },
                   ].map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
@@ -520,14 +642,14 @@ export function Dashboard() {
             <div className="mt-3 space-y-2">
               <h4 className="text-xs font-medium text-foreground">Agents sur le terrain</h4>
               <div className="grid grid-cols-2 gap-2">
-                {agents.slice(0, 3).map((agent) => (
+                {agentsData.slice(0, 3).map((agent) => (
                   <div key={agent.id} className="flex items-center gap-2 p-2 bg-muted rounded text-2xs">
                     <div className={cn(
                       "w-2 h-2 rounded-full",
-                      agent.status === "disponible" ? "bg-safe-zone" : "bg-warning"
+                      agent.statut === "actif" ? "bg-safe-zone" : "bg-warning"
                     )} />
                     <div>
-                      <div className="font-medium">{agent.nom}</div>
+                      <div className="font-medium">{agent.prenom} {agent.nom}</div>
                       <div className="text-muted-foreground">{agent.secteur}</div>
                     </div>
                   </div>
@@ -566,7 +688,7 @@ export function Dashboard() {
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="max-w-lg">
-                      <ActivityDetailDialog activity={activity} />
+                      <ActivityDetailDialog activity={activity} agentsData={agentsData} />
                     </DialogContent>
                   </Dialog>
                 </div>

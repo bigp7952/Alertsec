@@ -29,6 +29,20 @@ Route::prefix('auth')->group(function () {
     Route::post('register', [AuthController::class, 'register']);
 });
 
+// Route publique pour récupérer les comptes de démonstration
+Route::get('users/demo-accounts', function () {
+    $users = \App\Models\User::whereIn('matricule', ['ADM001', 'SUP001', 'SUP002', 'SUP003'])
+        ->where('statut', 'actif')
+        ->select('matricule', 'prenom', 'nom', 'grade', 'unite', 'secteur', 'role')
+        ->orderBy('matricule')
+        ->get();
+    
+    return response()->json([
+        'success' => true,
+        'data' => $users
+    ]);
+});
+
 // Routes API unifiées pour mobile et web
 Route::prefix('mobile')->middleware('auth:sanctum')->group(function () {
     // Authentification et profil
@@ -65,7 +79,7 @@ Route::prefix('mobile')->middleware('auth:sanctum')->group(function () {
 });
 
 // Routes protégées par authentification
-Route::middleware(['auth:sanctum', 'user.status'])->group(function () {
+Route::middleware(['auth:sanctum', 'user.status', 'sector.filter'])->group(function () {
     
     // Authentification
     Route::prefix('auth')->group(function () {
@@ -84,6 +98,10 @@ Route::middleware(['auth:sanctum', 'user.status'])->group(function () {
         Route::get('zones-stats', [DashboardController::class, 'getZonesStats']);
         Route::get('alerts', [DashboardController::class, 'getAlerts']);
         Route::get('map-data', [DashboardController::class, 'getMapData']);
+        
+        // Statistiques par superviseur (admin uniquement)
+        Route::get('superviseurs-stats', [DashboardController::class, 'getSuperviseursStats'])
+            ->middleware('role:admin');
     });
 
     // Signalements
@@ -100,14 +118,19 @@ Route::middleware(['auth:sanctum', 'user.status'])->group(function () {
             ->middleware('role:admin|superviseur');
         Route::post('{id}/assignation-automatique', [SignalementController::class, 'assignationAutomatique'])
             ->middleware('role:admin|superviseur');
+        // Création simplifiée depuis le dashboard
+        Route::post('quick', [SignalementController::class, 'quickStore']);
     });
 
     // Agents
     Route::prefix('agents')->group(function () {
         Route::get('/', [AgentController::class, 'index']);
+        Route::post('/', [AgentController::class, 'store'])->middleware('role:admin');
         Route::get('{id}', [AgentController::class, 'show']);
         Route::put('{id}', [AgentController::class, 'updateAgent'])
             ->middleware('role:admin|superviseur');
+        Route::delete('{id}', [AgentController::class, 'destroy'])
+            ->middleware('role:admin');
         
         // Tracking des agents
         Route::post('position/update', [AgentController::class, 'updatePosition'])

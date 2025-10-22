@@ -1,4 +1,5 @@
 import { useApp } from '@/contexts/AppContext';
+import { useApi } from '@/contexts/ApiContext';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import React, { useEffect, useRef, useState } from 'react';
@@ -75,6 +76,7 @@ interface AlertData {
 export default function AlertsScreen() {
   // Contexte global
   const { userType } = useApp();
+  const { signalements, fetchCitizenSignalements, createSignalement, signalementsLoading } = useApi();
 
   // États
   const [alerts, setAlerts] = useState<AlertData[]>([]);
@@ -142,10 +144,42 @@ export default function AlertsScreen() {
   ];
 
   useEffect(() => {
-    setAlerts(mockAlerts);
-    setFilteredAlerts(mockAlerts);
+    loadRealData();
     startAnimations();
   }, []);
+
+  const loadRealData = async () => {
+    try {
+      await fetchCitizenSignalements();
+      
+      // Convertir les signalements en format AlertData
+      const convertedAlerts = signalements.map(s => ({
+        id: s.id.toString(),
+        type: s.priorite === 'critique' ? 'emergency' : s.priorite === 'haute' ? 'urgent' : 'normal',
+        severity: s.priorite === 'critique' ? 'critical' : s.priorite === 'haute' ? 'high' : 'medium',
+        title: s.type,
+        description: s.description,
+        location: {
+          latitude: s.latitude,
+          longitude: s.longitude,
+          accuracy: 5,
+          address: s.adresse,
+        },
+        timestamp: new Date(s.date_signalement),
+        status: s.status === 'non traité' ? 'pending' : s.status === 'en cours' ? 'processing' : 'resolved',
+        category: s.type,
+        urgency: s.priorite === 'critique' ? 'immediate' : s.priorite === 'haute' ? 'urgent' : 'normal',
+      }));
+
+      setAlerts(convertedAlerts);
+      setFilteredAlerts(convertedAlerts);
+    } catch (error) {
+      console.error('Erreur lors du chargement des données:', error);
+      // Fallback sur les données simulées
+      setAlerts(mockAlerts);
+      setFilteredAlerts(mockAlerts);
+    }
+  };
 
   const startAnimations = () => {
     Animated.parallel([
@@ -166,12 +200,13 @@ export default function AlertsScreen() {
     setRefreshing(true);
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     
-    // Simulation de rafraîchissement
-    setTimeout(() => {
-      setAlerts(mockAlerts);
-      setFilteredAlerts(mockAlerts);
+    try {
+      await loadRealData();
+    } catch (error) {
+      console.error('Erreur lors du rafraîchissement:', error);
+    } finally {
       setRefreshing(false);
-    }, 1000);
+    }
   };
 
   const handleFilterChange = (filter: 'all' | 'pending' | 'processing' | 'resolved') => {
@@ -185,33 +220,51 @@ export default function AlertsScreen() {
     }
   };
 
-  const handleCreateAlert = () => {
+  const handleCreateAlert = async () => {
     if (!newAlert.title.trim() || !newAlert.description.trim()) {
       Alert.alert('Erreur', 'Veuillez remplir tous les champs obligatoires');
       return;
     }
 
-    const alert: AlertData = {
-      id: Date.now().toString(),
-      type: newAlert.urgency === 'immediate' ? 'emergency' : newAlert.urgency === 'urgent' ? 'urgent' : 'normal',
-      severity: newAlert.urgency === 'immediate' ? 'critical' : newAlert.urgency === 'urgent' ? 'high' : 'medium',
-      title: newAlert.title,
-      description: newAlert.description,
-      location: { latitude: 14.7167, longitude: -17.4677, accuracy: 5, address: 'Position actuelle' },
-      timestamp: new Date(),
-      status: 'pending',
-      category: newAlert.category,
-      urgency: newAlert.urgency,
-    };
+    try {
+      // Créer le signalement via l'API
+      const signalementData = {
+        description: newAlert.description,
+        type: newAlert.category || newAlert.title,
+        priorite: newAlert.urgency === 'immediate' ? 'critique' : newAlert.urgency === 'urgent' ? 'haute' : 'normale',
+        latitude: 14.7167, // Position par défaut
+        longitude: -17.4677,
+        adresse: 'Position actuelle',
+      };
 
-    const updatedAlerts = [alert, ...alerts];
-    setAlerts(updatedAlerts);
-    setFilteredAlerts(updatedAlerts);
-    setShowCreateModal(false);
-    setNewAlert({ title: '', description: '', category: '', urgency: 'normal' });
-    
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert('Succès', 'Votre signalement a été créé avec succès');
+      const newSignalement = await createSignalement(signalementData);
+
+      // Créer l'alerte locale pour l'affichage
+      const alert: AlertData = {
+        id: newSignalement.id.toString(),
+        type: newAlert.urgency === 'immediate' ? 'emergency' : newAlert.urgency === 'urgent' ? 'urgent' : 'normal',
+        severity: newAlert.urgency === 'immediate' ? 'critical' : newAlert.urgency === 'urgent' ? 'high' : 'medium',
+        title: newAlert.title,
+        description: newAlert.description,
+        location: { latitude: 14.7167, longitude: -17.4677, accuracy: 5, address: 'Position actuelle' },
+        timestamp: new Date(),
+        status: 'pending',
+        category: newAlert.category,
+        urgency: newAlert.urgency,
+      };
+
+      const updatedAlerts = [alert, ...alerts];
+      setAlerts(updatedAlerts);
+      setFilteredAlerts(updatedAlerts);
+      setShowCreateModal(false);
+      setNewAlert({ title: '', description: '', category: '', urgency: 'normal' });
+      
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Succès', 'Votre signalement a été créé avec succès');
+    } catch (error) {
+      console.error('Erreur lors de la création du signalement:', error);
+      Alert.alert('Erreur', 'Impossible de créer le signalement');
+    }
   };
 
   const handleEditAlert = (alert: AlertData) => {

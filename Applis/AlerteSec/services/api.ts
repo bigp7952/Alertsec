@@ -212,6 +212,16 @@ class ApiService {
     return response;
   }
 
+  async getCitizenSignalements(): Promise<Signalement[]> {
+    const response = await this.makeRequest<Signalement[]>('/mobile/citizen/signalements');
+    return response;
+  }
+
+  async getAllSignalements(): Promise<Signalement[]> {
+    const response = await this.makeRequest<Signalement[]>('/signalements');
+    return response;
+  }
+
   async createSignalement(signalementData: {
     description: string;
     type: string;
@@ -295,6 +305,11 @@ class ApiService {
   // Méthodes pour les zones de danger
   async getDangerZones(): Promise<ZoneDanger[]> {
     const response = await this.makeRequest<ZoneDanger[]>('/mobile/zones/danger');
+    return response;
+  }
+
+  async getAllDangerZones(): Promise<ZoneDanger[]> {
+    const response = await this.makeRequest<ZoneDanger[]>('/zones-danger');
     return response;
   }
 

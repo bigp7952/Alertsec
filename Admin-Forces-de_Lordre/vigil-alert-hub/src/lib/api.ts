@@ -130,17 +130,22 @@ class ApiService {
   }
 
   // Méthodes d'authentification
-  async login(email: string, password: string): Promise<AuthResponse> {
+  async login(matricule: string, password: string): Promise<AuthResponse> {
     const response = await fetch(`${this.baseURL}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ 
+        matricule, 
+        password,
+        code_service: 'DEMO' // Code service par défaut
+      }),
     });
 
     if (!response.ok) {
-      throw new Error('Erreur de connexion');
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Identifiants incorrects ou serveur inaccessible');
     }
 
     const data: ApiResponse<AuthResponse> = await response.json();
@@ -235,9 +240,28 @@ class ApiService {
     return response;
   }
 
+  async getAgent(id: number): Promise<User> {
+    const response = await this.makeRequest<User>(`/agents/${id}`);
+    return response;
+  }
+
   async getAgentPositions(): Promise<AgentTracking[]> {
     const response = await this.makeRequest<AgentTracking[]>('/agents/positions');
     return response;
+  }
+
+  async updateAgent(id: number, updates: Partial<User>): Promise<User> {
+    const response = await this.makeRequest<User>(`/agents/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+    return response;
+  }
+
+  async deleteAgent(id: number): Promise<void> {
+    await this.makeRequest<void>(`/agents/${id}`, {
+      method: 'DELETE',
+    });
   }
 
   async updateAgentPosition(position: Partial<AgentTracking>): Promise<AgentTracking> {
@@ -316,6 +340,11 @@ class ApiService {
 
   async getSignalementsStats(): Promise<any> {
     const response = await this.makeRequest('/dashboard/signalements-stats');
+    return response;
+  }
+
+  async getSuperviseursStats(): Promise<any> {
+    const response = await this.makeRequest('/dashboard/superviseurs-stats');
     return response;
   }
 

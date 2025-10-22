@@ -71,6 +71,7 @@ export default function Signalements() {
     positions, 
     loading: agentsLoading 
   } = useAgentTracking()
+  const [forcesAgents, setForcesAgents] = useState<User[]>([])
 
   const [viewMode, setViewMode] = useState<"grid" | "map">("grid")
   const [searchTerm, setSearchTerm] = useState("")
@@ -80,7 +81,10 @@ export default function Signalements() {
   const [isLoading, setIsLoading] = useState(false)
   const [isAssigning, setIsAssigning] = useState(false)
   const [selectedAgent, setSelectedAgent] = useState("")
+  const [assignTarget, setAssignTarget] = useState<Signalement | null>(null)
+  const [showAssignDialog, setShowAssignDialog] = useState(false)
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [previewMedia, setPreviewMedia] = useState<any | null>(null)
 
   // Récupérer les paramètres de navigation
   useEffect(() => {
@@ -96,13 +100,30 @@ export default function Signalements() {
     }
   }, [location.state, toast])
 
+  // Charger la liste des agents des forces si la source du hook est vide
+  useEffect(() => {
+    const loadAgents = async () => {
+      try {
+        const data = await apiService.getAgents()
+        setForcesAgents(data as any)
+      } catch (e) {
+        // noop
+      }
+    }
+    if (!agents || agents.length === 0) {
+      loadAgents()
+    } else {
+      setForcesAgents(agents as any)
+    }
+  }, [agents])
+
   const filteredSignalements = signalements.filter(signalement => {
-    const matchesSearch = signalement.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         signalement.citoyen.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         signalement.localisation.nom.toLowerCase().includes(searchTerm.toLowerCase())
+    const citoyenNom = `${signalement?.citoyen?.prenom ?? ''} ${signalement?.citoyen?.nom ?? ''}`.trim()
+    const adresse = (signalement as any)?.adresse ?? ''
+    const desc = signalement?.description ?? ''
+    const matchesSearch = `${desc} ${citoyenNom} ${adresse}`.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesType = filterType === "all" || signalement.niveau === filterType
     const matchesStatus = filterStatus === "all" || signalement.status === filterStatus
-    
     return matchesSearch && matchesType && matchesStatus
   })
 
@@ -110,7 +131,7 @@ export default function Signalements() {
     setSelectedSignalement(signalement)
     toast({
       title: "Signalement sélectionné",
-      description: `${signalement.citoyen} - ${signalement.localisation.nom}`,
+      description: `${`${signalement?.citoyen?.prenom ?? ''} ${signalement?.citoyen?.nom ?? ''}`.trim()} - ${(signalement as any)?.adresse || `${(signalement as any)?.latitude ?? ''}, ${(signalement as any)?.longitude ?? ''}`}`,
     })
   }
 
@@ -151,58 +172,65 @@ export default function Signalements() {
     }
   }
 
-  const handleCreateSignalement = async (signalementData: Omit<Signalement, 'id' | 'created_at' | 'updated_at'>) => {
+  const handleCreateSignalement = async (signalementData: any) => {
     setIsLoading(true)
     try {
-      await signalementsService.create(signalementData)
-      toast({
-        title: "Signalement créé",
-        description: "Le signalement a été créé avec succès",
+      // Adapter le payload attendu par l'API Laravel
+      const payload = {
+        description: signalementData?.description,
+        niveau: signalementData?.niveau || 'danger-medium',
+        type: signalementData?.type || 'autre',
+        latitude: signalementData?.localisation?.lat ?? null,
+        longitude: signalementData?.localisation?.lng ?? null,
+        adresse: signalementData?.localisation?.nom ?? '',
+        heure: signalementData?.heure || new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+        contact: signalementData?.contact || null,
+        medias: signalementData?.medias || { photos: [], videos: [], audios: [] },
+      }
+
+      const base = (import.meta as any).env?.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'
+      const res = await fetch(`${base}/signalements/quick`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+        },
+        body: JSON.stringify(payload)
       })
-    } catch (error) {
-      toast({
-        title: "Erreur",
-        description: "Impossible de créer le signalement",
-        variant: "destructive"
-      })
+      const data = await res.json()
+      if (!res.ok || !data?.success) throw new Error(data?.message || 'Erreur API')
+      toast({ title: "Signalement créé", description: "Le signalement a été créé avec succès" })
+      await fetchSignalements()
+    } catch (error: any) {
+      toast({ title: "Erreur", description: error?.message || "Impossible de créer le signalement", variant: "destructive" })
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleUpdateSignalement = async (id: string, updates: Partial<Signalement>) => {
+  const handleUpdateSignalement = async (id: number, updates: Partial<Signalement>) => {
     try {
-      await signalementsService.update(id, updates)
-      toast({
-        title: "Signalement mis à jour",
-        description: "Le signalement a été mis à jour avec succès",
-      })
-    } catch (error) {
-      toast({
-        title: "Erreur",
-        description: "Impossible de mettre à jour le signalement",
-        variant: "destructive"
-      })
+      await apiService.updateSignalement(id, updates)
+      toast({ title: "Signalement mis à jour", description: "Le signalement a été mis à jour avec succès" })
+      await fetchSignalements()
+    } catch (error: any) {
+      toast({ title: "Erreur", description: error?.message || "Impossible de mettre à jour le signalement", variant: "destructive" })
     }
   }
 
-  const handleDeleteSignalement = async (id: string) => {
+  const handleDeleteSignalement = async (id: number) => {
     try {
-      await signalementsService.delete(id)
-      toast({
-        title: "Signalement supprimé",
-        description: "Le signalement a été supprimé avec succès",
-      })
-    } catch (error) {
-      toast({
-        title: "Erreur",
-        description: "Impossible de supprimer le signalement",
-        variant: "destructive"
-      })
+      await apiService.deleteSignalement(id)
+      toast({ title: "Signalement supprimé", description: "Le signalement a été supprimé avec succès" })
+      await fetchSignalements()
+    } catch (error: any) {
+      toast({ title: "Erreur", description: error?.message || "Impossible de supprimer le signalement", variant: "destructive" })
     }
   }
 
-  const availableAgents = agents.filter(agent => agent.status === 'disponible')
+  const availableAgents = (forcesAgents || [])
+    .filter((agent: any) => (agent.role === 'agent' || agent.role === 'superviseur' || agent.role === 'admin'))
+    .filter((agent: any) => (agent.statut ?? 'actif') !== 'inactif')
 
   return (
     <div className="space-y-4">
@@ -410,7 +438,7 @@ export default function Signalements() {
                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <User className="h-3 w-3" />
-                    {signalement.citoyen}
+                    {`${signalement?.citoyen?.prenom ?? ''} ${signalement?.citoyen?.nom ?? ''}`.trim()}
                   </div>
                   <div className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
@@ -420,7 +448,7 @@ export default function Signalements() {
                 
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <MapPin className="h-3 w-3" />
-                  {signalement.localisation.nom}
+                  {(signalement as any)?.adresse || `${(signalement as any)?.latitude ?? ''}, ${(signalement as any)?.longitude ?? ''}`}
                 </div>
                 
                 {/* Indicateurs de médias */}
@@ -457,7 +485,7 @@ export default function Signalements() {
                 
                 {signalement.agent_assigne && (
                   <div className="text-xs text-muted-foreground">
-                    Agent: {agents.find(a => a.id.toString() === signalement.agent_assigne)?.nom || signalement.agent_assigne}
+                    Agent: {`${(signalement as any).agent_assigne?.prenom ?? ''} ${(signalement as any).agent_assigne?.nom ?? ''}`.trim()}
                   </div>
                 )}
                 
@@ -482,7 +510,8 @@ export default function Signalements() {
                       className="flex-1 text-xs"
                       onClick={(e) => {
                         e.stopPropagation()
-                        setSelectedSignalement(signalement)
+                        setAssignTarget(signalement)
+                        setShowAssignDialog(true)
                       }}
                     >
                       <Zap className="h-3 w-3 mr-1" />
@@ -507,121 +536,232 @@ export default function Signalements() {
         </Card>
       )}
 
-      {/* Dialog pour les détails du signalement */}
+      {/* Dialog pour les détails du signalement - robuste */}
       {selectedSignalement && (
         <Dialog open={!!selectedSignalement} onOpenChange={() => setSelectedSignalement(null)}>
-          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5" />
-                Détails du signalement - {selectedSignalement.citoyen}
+                Détails du signalement
               </DialogTitle>
             </DialogHeader>
             
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Colonne gauche - Informations de base */}
-              <div className="space-y-6">
-                {/* Informations générales */}
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Informations générales</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <div className="text-xs text-muted-foreground">Citoyen</div>
+                    <div className="font-medium">{`${selectedSignalement?.citoyen?.prenom ?? ''} ${selectedSignalement?.citoyen?.nom ?? ''}`.trim() || '—'}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Heure</div>
+                    <div>{selectedSignalement?.heure || '—'}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Adresse / Coordonnées</div>
+                    <div>{(selectedSignalement as any)?.adresse || `${(selectedSignalement as any)?.latitude ?? ''}, ${(selectedSignalement as any)?.longitude ?? ''}` || '—'}</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-xs text-muted-foreground">Statut</div>
+                    <Badge variant={
+                      selectedSignalement?.status === 'traité' ? 'success' :
+                      selectedSignalement?.status === 'en cours' ? 'warning' : 'secondary'
+                    }>
+                      {getStatusLabel(selectedSignalement?.status || '')}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-xs text-muted-foreground">Niveau</div>
+                    <Badge variant={getBadgeVariant(selectedSignalement?.niveau || '')}>{getNiveauLabel(selectedSignalement?.niveau || '')}</Badge>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Type</div>
+                    <div>{(selectedSignalement as any)?.type || '—'}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Priorité</div>
+                    <div>{(selectedSignalement as any)?.priorite || '—'}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Agent assigné</div>
+                    <div>{`${(selectedSignalement as any)?.agent_assigne?.prenom ?? ''} ${(selectedSignalement as any)?.agent_assigne?.nom ?? ''}`.trim() || '—'}</div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Description</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-sm p-3 bg-muted rounded">{selectedSignalement?.description || '—'}</div>
+                </CardContent>
+              </Card>
+
+              {selectedSignalement?.medias && (
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Informations générales</CardTitle>
+                    <CardTitle className="text-base">Médias</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+                  <CardContent className="space-y-3">
+                    {/* Photos */}
+                    {selectedSignalement.medias.photos && selectedSignalement.medias.photos.length > 0 && (
                 <div>
-                  <label className="text-xs font-medium text-foreground">Citoyen</label>
-                        <p className="text-sm font-medium">{selectedSignalement.citoyen}</p>
+                        <div className="text-xs text-muted-foreground mb-2">Photos</div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                          {selectedSignalement.medias.photos.map((p: any) => (
+                            <div key={p.id} className="group">
+                              <button onClick={() => setPreviewMedia({ ...p, kind: 'photo' })} className="block w-full text-left">
+                                <img src={p.url} alt={p.nom_fichier || 'photo'} className="w-full h-24 object-cover rounded" />
+                              </button>
+                              <div className="flex items-center justify-between gap-2 mt-1">
+                                <div className="text-2xs truncate">{p.nom_fichier}</div>
+                                <a href={p.url} download className="text-primary text-2xs">Télécharger</a>
                 </div>
-                <div>
-                  <label className="text-xs font-medium text-foreground">Heure</label>
-                  <p className="text-sm">{selectedSignalement.heure}</p>
                 </div>
-                <div>
-                  <label className="text-xs font-medium text-foreground">Localisation</label>
-                  <p className="text-sm">{selectedSignalement.localisation.nom}</p>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-foreground">Statut</label>
-                  <Badge variant={getBadgeVariant(selectedSignalement.niveau)}>
-                    {getStatusLabel(selectedSignalement.status)}
-                  </Badge>
+                          ))}
                 </div>
               </div>
+                    )}
               
+                    {/* Videos */}
+                    {selectedSignalement.medias.videos && selectedSignalement.medias.videos.length > 0 && (
               <div>
-                <label className="text-xs font-medium text-foreground">Description</label>
-                      <p className="text-sm mt-1 p-3 bg-muted rounded-lg">{selectedSignalement.description}</p>
+                        <div className="text-xs text-muted-foreground mb-2">Vidéos</div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {selectedSignalement.medias.videos.map((v: any) => (
+                            <div key={v.id} className="space-y-1">
+                              <video controls src={v.url} className="w-full rounded" />
+                              <div className="flex items-center justify-between text-2xs">
+                                <button onClick={() => setPreviewMedia({ ...v, kind: 'video' })} className="text-2xs text-foreground underline">Voir</button>
+                                <a href={v.url} download className="text-primary">Télécharger</a>
                     </div>
+                            </div>
+                          ))}
+                        </div>
+                            </div>
+                          )}
 
-                    {/* Informations de contact */}
-                    {selectedSignalement.contact && (
-                      <div className="space-y-2">
-                        <label className="text-xs font-medium text-foreground">Contact</label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {selectedSignalement.contact.telephone && (
-                            <div className="flex items-center gap-2 p-2 bg-muted rounded">
-                              <span className="text-xs">📞</span>
-                              <span className="text-sm">{selectedSignalement.contact.telephone}</span>
+                    {/* Audios */}
+                    {selectedSignalement.medias.audios && selectedSignalement.medias.audios.length > 0 && (
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-2">Audios</div>
+                        <div className="space-y-2">
+                          {selectedSignalement.medias.audios.map((a: any) => (
+                            <div key={a.id} className="flex items-center justify-between gap-2">
+                              <audio controls src={a.url} />
+                              <div className="flex items-center gap-3">
+                                <button onClick={() => setPreviewMedia({ ...a, kind: 'audio' })} className="text-2xs text-foreground underline">Écouter</button>
+                                <a href={a.url} download className="text-primary text-2xs">Télécharger</a>
+                              </div>
                             </div>
-                          )}
-                          {selectedSignalement.contact.email && (
-                            <div className="flex items-center gap-2 p-2 bg-muted rounded">
-                              <span className="text-xs">📧</span>
-                              <span className="text-sm">{selectedSignalement.contact.email}</span>
-                            </div>
-                          )}
+                          ))}
                         </div>
                       </div>
                     )}
+
+                    {(!selectedSignalement.medias.photos?.length && !selectedSignalement.medias.videos?.length && !selectedSignalement.medias.audios?.length) && (
+                      <div className="text-sm text-muted-foreground">Aucun média.</div>
+                    )}
                   </CardContent>
                 </Card>
+              )}
 
-                {/* Lecteur de médias */}
-                <MediaViewer signalement={selectedSignalement} />
+              {(selectedSignalement as any)?.contact && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Contact</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    {((selectedSignalement as any)?.contact?.telephone) && (
+                      <div>
+                        <div className="text-xs text-muted-foreground">Téléphone</div>
+                        <div>{(selectedSignalement as any)?.contact?.telephone}</div>
+                      </div>
+                    )}
+                    {((selectedSignalement as any)?.contact?.email) && (
+                      <div>
+                        <div className="text-xs text-muted-foreground">Email</div>
+                        <div>{(selectedSignalement as any)?.contact?.email}</div>
+                      </div>
+                    )}
+                    {!((selectedSignalement as any)?.contact?.telephone) && !((selectedSignalement as any)?.contact?.email) && (
+                      <div>—</div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
-                {/* Communication avec le citoyen */}
-                <CommunicationPanel 
-                  signalement={selectedSignalement}
-                  onSendMessage={(message, type) => {
-                    toast({
-                      title: "Message envoyé",
-                      description: `${type}: ${message}`,
-                    })
-                  }}
-                />
+      {/* Lightbox media preview */}
+      {previewMedia && (
+        <Dialog open={!!previewMedia} onOpenChange={() => setPreviewMedia(null)}>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle className="text-sm truncate">{previewMedia?.nom_fichier || 'Média'}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              {previewMedia.kind === 'photo' && (
+                <img src={previewMedia.url} alt={previewMedia.nom_fichier || 'photo'} className="w-full max-h-[70vh] object-contain rounded" />
+              )}
+              {previewMedia.kind === 'video' && (
+                <video controls src={previewMedia.url} className="w-full rounded" />
+              )}
+              {previewMedia.kind === 'audio' && (
+                <audio controls src={previewMedia.url} className="w-full" />
+              )}
+              <div className="flex justify-end">
+                <a href={previewMedia.url} download className="text-primary text-sm">Télécharger</a>
               </div>
-              
-              {/* Colonne droite - Actions et tracking */}
-              <div className="space-y-6">
-                {/* Assignation automatique */}
-                <AutoAssignment 
-                  signalement={selectedSignalement}
-                  agents={agents}
-                  onAssignAgent={handleAssignAgent}
-                  isAssigning={isAssigning}
-                />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
-                {/* Tracking des agents */}
-                <AgentTracker 
-                  agents={agents}
-                  onAgentSelect={(agent) => {
-                    toast({
-                      title: "Agent sélectionné",
-                      description: `${agent.nom} - ${agent.secteur}`,
-                    })
-                  }}
-                />
-
-                {/* Zones de danger */}
-                <DangerZones 
-                  signalements={signalements}
-                  onZoneSelect={(zone) => {
-                    toast({
-                      title: "Zone sélectionnée",
-                      description: `${zone.name} - Niveau de risque: ${zone.level}%`,
-                    })
-                  }}
-                />
+      {/* Dialog d'assignation d'agent */}
+      {assignTarget && (
+        <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-sm">Assigner un agent · #{assignTarget.id}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="text-xs text-muted-foreground">Agents disponibles</div>
+              <div className="grid gap-2 max-h-72 overflow-y-auto">
+                {availableAgents.map((ag: any) => (
+                  <div key={ag.id} className="flex items-center justify-between p-2 border rounded">
+                    <div className="text-sm">
+                      <div className="font-medium">{ag.prenom} {ag.nom}</div>
+                      <div className="text-xs text-muted-foreground">{ag.grade} · {ag.unite} · {ag.secteur}</div>
+                    </div>
+                    <Button size="sm" onClick={async () => {
+                      setIsAssigning(true)
+                      try {
+                        await assignAgent(assignTarget.id, ag.id)
+                        toast({ title: 'Agent assigné', description: `${ag.prenom} ${ag.nom} a été assigné` })
+                        setShowAssignDialog(false)
+                        setAssignTarget(null)
+                        await fetchSignalements()
+                      } catch (err: any) {
+                        toast({ title: 'Erreur', description: err?.message || 'Échec de l\'assignation', variant: 'destructive' })
+                      } finally {
+                        setIsAssigning(false)
+                      }
+                    }} disabled={isAssigning}>
+                      {isAssigning ? 'Assignation…' : 'Assigner'}
+                    </Button>
+                  </div>
+                ))}
+                {availableAgents.length === 0 && (
+                  <div className="text-sm text-muted-foreground">Aucun agent disponible.</div>
+                )}
                 </div>
             </div>
           </DialogContent>

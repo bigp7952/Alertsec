@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -27,114 +27,41 @@ import { History, Filter, Clock, User, MapPin, Eye, ArrowLeft, Calendar, UserChe
 import { cn } from "@/lib/utils"
 import { useNavigate } from "react-router-dom"
 import { useToast } from "@/hooks/use-toast"
+import apiService, { type Signalement, type User } from '@/lib/api'
 
-// Données étendues pour l'historique complet
-const historiqueComplet = [
-  {
-    id: 1,
-    type: "critical",
-    message: "Accident grave autoroute",
-    time: "Il y a 5 min",
-    date: "2024-01-20",
-    heure: "14:30",
-    location: "Autoroute A1",
-    details: "Collision entre 3 véhicules. Blessés graves signalés. Ambulances en route.",
-    reporter: "Amadou Ba",
-    status: "en cours",
-    agent: "Agent Martin"
-  },
-  {
-    id: 2,
-    type: "medium",
-    message: "Vol signalé Sandaga",
-    time: "Il y a 12 min",
-    date: "2024-01-20",
-    heure: "14:15",
-    location: "Marché Sandaga",
-    details: "Vol à la tire signalé par une commerçante. Suspect en fuite.",
-    reporter: "Marie Diallo",
-    status: "non traité",
-    agent: null
-  },
-  {
-    id: 3,
-    type: "safe",
-    message: "Zone Almadies sécurisée",
-    time: "Il y a 25 min",
-    date: "2024-01-20",
-    heure: "14:00",
-    location: "Quartier Almadies",
-    details: "Intervention terminée avec succès. Zone maintenant sécurisée.",
-    reporter: "Fatou Sow",
-    status: "traité",
-    agent: "Agent Diop"
-  },
-  {
-    id: 4,
-    type: "critical",
-    message: "Incendie immeuble résidentiel",
-    time: "Il y a 2h",
-    date: "2024-01-20",
-    heure: "12:30",
-    location: "Médina",
-    details: "Incendie déclaré dans un immeuble. Plusieurs familles évacuées.",
-    reporter: "Omar Diop",
-    status: "traité",
-    agent: "Pompiers Secteur Sud"
-  },
-  {
-    id: 5,
-    type: "medium",
-    message: "Bagarre rue Félix Faure",
-    time: "Il y a 3h",
-    date: "2024-01-20",
-    heure: "11:45",
-    location: "Rue Félix Faure",
-    details: "Altercation entre plusieurs personnes. Situation sous contrôle.",
-    reporter: "Khadija Fall",
-    status: "traité",
-    agent: "Agent Fall"
-  },
-  {
-    id: 6,
-    type: "safe",
-    message: "Patrouille préventive terminée",
-    time: "Il y a 4h",
-    date: "2024-01-20",
-    heure: "10:30",
-    location: "Plateau",
-    details: "Patrouille de routine effectuée sans incident.",
-    reporter: "Système",
-    status: "traité",
-    agent: "Agent Martin"
-  },
-  {
-    id: 7,
-    type: "medium",
-    message: "Véhicule suspect signalé",
-    time: "Hier 18:20",
-    date: "2024-01-19",
-    heure: "18:20",
-    location: "Corniche",
-    details: "Véhicule sans plaque d'immatriculation stationné.",
-    reporter: "Citoyen anonyme",
-    status: "traité",
-    agent: "Agent Diop"
-  },
-  {
-    id: 8,
-    type: "critical",
-    message: "Cambriolage en cours",
-    time: "Hier 15:10",
-    date: "2024-01-19",
-    heure: "15:10",
-    location: "Fann Résidence",
-    details: "Tentative de cambriolage signalée par un voisin.",
-    reporter: "Ibrahim Sarr",
-    status: "traité",
-    agent: "Agent Fall"
+// Fonction pour convertir les signalements en format historique
+const convertSignalementToHistorique = (signalement: Signalement) => {
+  const date = new Date(signalement.date_signalement)
+  const now = new Date()
+  const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60))
+  
+  let timeAgo = ""
+  if (diffInMinutes < 60) {
+    timeAgo = `Il y a ${diffInMinutes} min`
+  } else if (diffInMinutes < 1440) {
+    const hours = Math.floor(diffInMinutes / 60)
+    timeAgo = `Il y a ${hours}h`
+  } else {
+    const days = Math.floor(diffInMinutes / 1440)
+    timeAgo = `Il y a ${days} jour${days > 1 ? 's' : ''}`
   }
-]
+
+  return {
+    id: signalement.id,
+    type: signalement.niveau === 'danger-critical' ? 'critical' : 
+          signalement.niveau === 'danger-medium' ? 'medium' : 'safe',
+    message: `${signalement.type} - ${signalement.description.substring(0, 50)}${signalement.description.length > 50 ? '...' : ''}`,
+    time: timeAgo,
+    date: date.toISOString().split('T')[0],
+    heure: signalement.heure || date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+    location: signalement.adresse || `Lat: ${signalement.latitude}, Lng: ${signalement.longitude}`,
+    details: signalement.description,
+    reporter: signalement.citoyen ? `${signalement.citoyen.prenom} ${signalement.citoyen.nom}` : 'Citoyen',
+    status: signalement.status,
+    agent: signalement.agent_assigne ? `${signalement.agent_assigne.prenom} ${signalement.agent_assigne.nom}` : null,
+    signalement: signalement // Garder la référence complète
+  }
+}
 
 // Composant pour les détails d'activité
 function ActivityDetailDialog({ activity }: { activity: any }) {
@@ -143,6 +70,20 @@ function ActivityDetailDialog({ activity }: { activity: any }) {
   const [isAssigning, setIsAssigning] = useState(false)
   const [selectedAgent, setSelectedAgent] = useState("")
   const [notes, setNotes] = useState("")
+  const [agents, setAgents] = useState<User[]>([])
+
+  // Charger la liste des agents
+  useEffect(() => {
+    const loadAgents = async () => {
+      try {
+        const agentsData = await apiService.getAgents()
+        setAgents(agentsData)
+      } catch (error) {
+        console.error('Erreur lors du chargement des agents:', error)
+      }
+    }
+    loadAgents()
+  }, [])
 
   const handleTakeCharge = async () => {
     if (!selectedAgent) {
@@ -157,22 +98,23 @@ function ActivityDetailDialog({ activity }: { activity: any }) {
     setIsAssigning(true)
     
     try {
-      // Simulation d'assignation
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      // Assignation réelle via l'API
+      await apiService.assignAgent(activity.id, parseInt(selectedAgent))
       
       toast({
         title: "Prise en charge confirmée",
-        description: `${selectedAgent} a été assigné au signalement "${activity.message}"`,
+        description: `L'agent a été assigné au signalement "${activity.message}"`,
       })
       
-      // Mise à jour du statut de l'activité (simulation)
+      // Mise à jour du statut de l'activité
       activity.status = "en cours"
-      activity.agent = selectedAgent
+      const selectedAgentData = agents.find(a => a.id.toString() === selectedAgent)
+      activity.agent = selectedAgentData ? `${selectedAgentData.prenom} ${selectedAgentData.nom}` : "Agent assigné"
       
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Erreur",
-        description: "Impossible d'assigner l'agent",
+        description: error.message || "Impossible d'assigner l'agent",
         variant: "destructive"
       })
     } finally {
@@ -196,13 +138,10 @@ function ActivityDetailDialog({ activity }: { activity: any }) {
     })
   }
 
-  const availableAgents = [
-    "Agent Martin (Secteur Nord)",
-    "Agent Diop (Centre-ville)", 
-    "Agent Fall (Secteur Sud)",
-    "Agent Ndiaye (Secteur Est)",
-    "Agent Sy (Secteur Ouest)"
-  ]
+  const availableAgents = agents.map(agent => ({
+    value: agent.id.toString(),
+    label: `${agent.prenom} ${agent.nom} (${agent.unite || agent.secteur})`
+  }))
 
   return (
     <>
@@ -268,8 +207,8 @@ function ActivityDetailDialog({ activity }: { activity: any }) {
                   </SelectTrigger>
                   <SelectContent>
                     {availableAgents.map((agent) => (
-                      <SelectItem key={agent} value={agent}>
-                        {agent}
+                      <SelectItem key={agent.value} value={agent.value}>
+                        {agent.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -363,6 +302,31 @@ export default function Historique() {
   const [filterType, setFilterType] = useState("all")
   const [filterStatus, setFilterStatus] = useState("all")
   const [filterDate, setFilterDate] = useState("all")
+  const [signalements, setSignalements] = useState<Signalement[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Charger les signalements depuis l'API
+  useEffect(() => {
+    const fetchSignalements = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const data = await apiService.getSignalements()
+        setSignalements(data)
+      } catch (e: any) {
+        console.error('Erreur lors du chargement des signalements:', e)
+        setError(e?.message || 'Erreur lors du chargement des données')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchSignalements()
+  }, [])
+
+  // Convertir les signalements en format historique
+  const historiqueComplet = signalements.map(convertSignalementToHistorique)
 
   const filteredHistorique = historiqueComplet.filter(activity => {
     const matchesSearch = activity.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -370,9 +334,19 @@ export default function Historique() {
                          activity.reporter.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesType = filterType === "all" || activity.type === filterType
     const matchesStatus = filterStatus === "all" || activity.status === filterStatus
-    const matchesDate = filterDate === "all" || 
-                       (filterDate === "today" && activity.date === "2024-01-20") ||
-                       (filterDate === "yesterday" && activity.date === "2024-01-19")
+    
+    // Filtrage par date
+    let matchesDate = true
+    if (filterDate !== "all") {
+      const today = new Date().toISOString().split('T')[0]
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      
+      if (filterDate === "today") {
+        matchesDate = activity.date === today
+      } else if (filterDate === "yesterday") {
+        matchesDate = activity.date === yesterday
+      }
+    }
     
     return matchesSearch && matchesType && matchesStatus && matchesDate
   })
@@ -402,6 +376,72 @@ export default function Historique() {
       case "traité": return "Traité"
       default: return status
     }
+  }
+
+  // Affichage de chargement
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => navigate("/")}
+            className="px-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-lg font-bold text-foreground flex items-center gap-2">
+              <History className="h-4 w-4 text-primary" />
+              Historique des Activités
+            </h1>
+            <p className="text-xs text-muted-foreground">Chargement des données...</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-center h-32">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    )
+  }
+
+  // Affichage d'erreur
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => navigate("/")}
+            className="px-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-lg font-bold text-foreground flex items-center gap-2">
+              <History className="h-4 w-4 text-primary" />
+              Historique des Activités
+            </h1>
+            <p className="text-xs text-red-500">Erreur: {error}</p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="py-8 text-center">
+            <p className="text-sm text-muted-foreground">Impossible de charger l'historique des activités.</p>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="mt-4"
+              onClick={() => window.location.reload()}
+            >
+              Réessayer
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (

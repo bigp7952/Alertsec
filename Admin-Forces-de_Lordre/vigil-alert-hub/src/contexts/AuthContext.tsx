@@ -119,39 +119,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAuthState({ user: res.user as unknown as User, isAuthenticated: true, isLoading: false, sessionExpiry })
         toast({ title: 'Connexion réussie', description: `Bienvenue ${res.user.prenom} ${res.user.nom}` })
         return true
-      } catch (e) {
-        // Fallback mock si backend KO
-        const result = await AuthService.login(credentials)
-      
-      if (!result.success || !result.user) {
-        toast({
-          title: "Erreur de connexion",
-          description: result.message,
-          variant: "destructive"
-        })
-        return false
-      }
-      
-      // Session de 8 heures pour la sécurité
-      const sessionExpiry = Date.now() + (8 * 60 * 60 * 1000)
-      
-      // Sauvegarde sécurisée
-      localStorage.setItem('police_session', JSON.stringify(result.user))
-      localStorage.setItem('police_session_expiry', sessionExpiry.toString())
-      
-      setAuthState({
-        user: result.user,
-        isAuthenticated: true,
-        isLoading: false,
-        sessionExpiry
-      })
-      
-      toast({
-        title: "Connexion réussie",
-        description: `Bienvenue ${result.user.grade} ${result.user.prenom} ${result.user.nom}`,
-      })
-      
-      return true
+      } catch (e: any) {
+        // Si le backend échoue, ne pas utiliser le fallback mock
+        throw new Error(e.message || 'Erreur de connexion au serveur backend')
       }
       
     } catch (error) {

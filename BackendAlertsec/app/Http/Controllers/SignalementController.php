@@ -11,12 +11,24 @@ use App\Models\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
+use App\Events\SignalementAssigne;
 
 class SignalementController extends Controller
 {
     public function index(Request $request)
     {
+        // Eager load médias désormais que le modèle pointe la bonne table
         $query = Signalement::with(['citoyen', 'agentAssigne', 'mediasFiles']);
+
+        // Filtrage par secteur pour les superviseurs
+        if ($request->filled('secteur_filter')) {
+            $secteur = $request->secteur_filter;
+            $query->whereHas('citoyen', function($q) use ($secteur) {
+                $q->where('secteur', $secteur);
+            })->orWhereHas('agentAssigne', function($q) use ($secteur) {
+                $q->where('secteur', $secteur);
+            });
+        }
 
         // Filtres
         if ($request->filled('status')) {
@@ -52,35 +64,75 @@ class SignalementController extends Controller
             $query->dansZone($request->latitude, $request->longitude, $request->rayon);
         }
 
-        $signalements = $query->orderBy('date_signalement', 'desc')
-            ->paginate($request->get('per_page', 15));
+        try {
+            // Retourner une collection simple (attendue par le front)
+            $signalements = $query->orderBy('date_signalement', 'desc')->get();
 
-        return response()->json([
-            'success' => true,
-            'data' => $signalements
-        ]);
+            // Normaliser quelques champs pour éviter les nulls côté front
+            $normalized = $signalements->map(function ($s) {
+                $s->priorite = $s->priorite ?? 'CRITIQUE';
+                $s->heure = $s->heure ?? optional($s->date_signalement)->format('H:i:s');
+                // S'assurer que les relations existent
+                $s->citoyen = $s->citoyen; // déjà chargé par with()
+                $s->agent_assigne = $s->agentAssigne; // alias plus intuitif côté front
+                // Normaliser médias en groupes (photos/videos/audios) + URLs
+                $photos = collect();
+                $videos = collect();
+                $audios = collect();
+                foreach ($s->mediasFiles as $m) {
+                    $item = [
+                        'id' => $m->id,
+                        'url' => $m->url,
+                        'type_mime' => $m->type_mime,
+                        'nom_fichier' => $m->nom_fichier,
+                        'taille' => $m->formatted_size ?? $m->taille_fichier,
+                        'duree' => $m->formatted_duration ?? null,
+                    ];
+                    if ($m->type_media === 'photo') $photos->push($item);
+                    elseif ($m->type_media === 'video') $videos->push($item);
+                    elseif ($m->type_media === 'audio') $audios->push($item);
+                }
+                $s->medias = [
+                    'photos' => $photos->values(),
+                    'videos' => $videos->values(),
+                    'audios' => $audios->values(),
+                ];
+                unset($s->agentAssigne);
+                return $s;
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => $normalized
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error('Erreur index signalements: '.$e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors du chargement des signalements'
+            ], 500);
+        }
     }
 
     public function store(Request $request)
     {
+        // Assouplir la validation pour accepter les payloads JSON du dashboard
         $validator = Validator::make($request->all(), [
-            'description' => 'required|string|max:1000',
-            'niveau' => 'required|in:danger-critical,danger-medium,safe-zone',
-            'type' => 'required|in:agression,vol,accident,incendie,autre',
-            'latitude' => 'required|numeric|between:-90,90',
-            'longitude' => 'required|numeric|between:-180,180',
-            'adresse' => 'required|string|max:255',
-            'heure' => 'required|date_format:H:i:s',
+            'description' => 'required|string|max:2000',
+            'niveau' => 'sometimes|in:danger-critical,danger-medium,safe-zone',
+            'type' => 'sometimes|in:agression,vol,accident,incendie,autre',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
+            'adresse' => 'nullable|string|max:255',
+            'heure' => 'nullable|date_format:H:i:s',
             'contact' => 'nullable|array',
             'contact.telephone' => 'nullable|string',
             'contact.email' => 'nullable|email',
+            // Accepter des URLs/json pour médias depuis le dashboard (pas d'upload fichier requis ici)
             'medias' => 'nullable|array',
             'medias.photos' => 'nullable|array',
-            'medias.photos.*' => 'image|max:10240', // 10MB max
             'medias.videos' => 'nullable|array',
-            'medias.videos.*' => 'mimes:mp4,avi,mov|max:51200', // 50MB max
             'medias.audios' => 'nullable|array',
-            'medias.audios.*' => 'mimes:mp3,wav,m4a|max:10240', // 10MB max
         ]);
 
         if ($validator->fails()) {
@@ -95,32 +147,34 @@ class SignalementController extends Controller
 
         $signalement = Signalement::create([
             'citoyen_id' => $user->id,
-            'description' => $request->description,
-            'niveau' => $request->niveau,
-            'type' => $request->type,
-            'priorite' => $this->calculerPriorite($request->all()),
-            'latitude' => $request->latitude,
-            'longitude' => $request->longitude,
-            'adresse' => $request->adresse,
-            'heure' => $request->heure,
+            'description' => $request->input('description'),
+            'niveau' => $request->input('niveau', 'danger-medium'),
+            'type' => $request->input('type', 'autre'),
+            'priorite' => $this->calculerPriorite([
+                'niveau' => $request->input('niveau', 'danger-medium'),
+                'type' => $request->input('type', 'autre'),
+            ]),
+            'latitude' => $request->input('latitude'),
+            'longitude' => $request->input('longitude'),
+            'adresse' => $request->input('adresse'),
+            'heure' => $request->input('heure', now()->format('H:i:s')),
             'date_signalement' => now(),
-            'contact' => $request->contact,
-            'medias' => $request->medias ?? ['photos' => [], 'videos' => [], 'audios' => []],
+            'contact' => $request->input('contact'),
+            // Stocker temporairement les médias côté JSON si envoyés en URLs
+            'medias' => $request->input('medias', ['photos' => [], 'videos' => [], 'audios' => []]),
         ]);
 
-        // Traitement des médias
+        // Optionnel: si upload fichiers (multipart), on crée des entrées Media
         if ($request->hasFile('medias.photos')) {
             foreach ($request->file('medias.photos') as $photo) {
                 Media::creerMedia($signalement->id, $photo, 'photo');
             }
         }
-
         if ($request->hasFile('medias.videos')) {
             foreach ($request->file('medias.videos') as $video) {
                 Media::creerMedia($signalement->id, $video, 'video');
             }
         }
-
         if ($request->hasFile('medias.audios')) {
             foreach ($request->file('medias.audios') as $audio) {
                 Media::creerMedia($signalement->id, $audio, 'audio');
@@ -136,8 +190,47 @@ class SignalementController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Signalement créé avec succès',
-            'data' => $signalement->load(['citoyen', 'mediasFiles'])
+            'data' => $signalement->load(['citoyen', 'agentAssigne', 'mediasFiles'])
         ], 201);
+    }
+
+    // Endpoint simplifié pour le dashboard: accepte le payload du formulaire tel quel
+    public function quickStore(Request $request)
+    {
+        try {
+            $user = $request->user();
+            $payload = $request->all();
+
+            $signalement = Signalement::create([
+                'citoyen_id' => $user->id,
+                'description' => $payload['description'] ?? '',
+                'niveau' => $payload['niveau'] ?? 'danger-medium',
+                'type' => $payload['type'] ?? 'autre',
+                'priorite' => $this->calculerPriorite([
+                    'niveau' => $payload['niveau'] ?? 'danger-medium',
+                    'type' => $payload['type'] ?? 'autre',
+                ]),
+                'latitude' => $payload['localisation']['lat'] ?? $payload['latitude'] ?? null,
+                'longitude' => $payload['localisation']['lng'] ?? $payload['longitude'] ?? null,
+                'adresse' => $payload['localisation']['nom'] ?? $payload['adresse'] ?? null,
+                'heure' => $payload['heure'] ?? now()->format('H:i:s'),
+                'date_signalement' => now(),
+                'contact' => $payload['contact'] ?? null,
+                'medias' => $payload['medias'] ?? ['photos' => [], 'videos' => [], 'audios' => []],
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Signalement créé (rapide)',
+                'data' => $signalement->load(['citoyen', 'agentAssigne', 'mediasFiles'])
+            ], 201);
+        } catch (\Throwable $e) {
+            \Log::error('quickStore failed: '.$e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Création échouée',
+            ], 400);
+        }
     }
 
     public function show($id)
@@ -245,6 +338,13 @@ class SignalementController extends Controller
         }
 
         $signalement->assignerAgent($request->agent_id);
+
+        // Broadcast à l'agent assigné avec toutes les infos
+        try {
+            event(new SignalementAssigne($signalement, (int) $request->agent_id));
+        } catch (\Throwable $e) {
+            \Log::warning('Broadcast SignalementAssigne échoué: '.$e->getMessage());
+        }
 
         return response()->json([
             'success' => true,

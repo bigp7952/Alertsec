@@ -1,4 +1,5 @@
 import { useApp } from '@/contexts/AppContext';
+import { useApi } from '@/contexts/ApiContext';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { Camera } from 'expo-camera';
@@ -102,6 +103,17 @@ export default function HomeScreen() {
     setMapInitialized 
   } = useApp();
 
+  // Contexte API
+  const { 
+    signalements, 
+    dangerZones: apiDangerZones, 
+    fetchCitizenSignalements, 
+    fetchDangerZones,
+    createSignalement,
+    signalementsLoading,
+    dangerZonesLoading 
+  } = useApi();
+
   // États locaux
   const [alerts, setAlerts] = useState<AlertData[]>([]);
   const [dangerZones, setDangerZones] = useState<DangerZone[]>([]);
@@ -189,10 +201,60 @@ export default function HomeScreen() {
     }
 
     requestPermissions();
-    setAlerts(mockAlerts);
-    setDangerZones(mockDangerZones);
+    loadRealData();
     startPulseAnimation();
   }, [isAuthenticated, userType]);
+
+  // Charger les vraies données
+  const loadRealData = async () => {
+    try {
+      // Charger les signalements et zones de danger
+      await Promise.all([
+        fetchCitizenSignalements(),
+        fetchDangerZones(),
+      ]);
+
+      // Convertir les signalements en format AlertData
+      const convertedAlerts = signalements.map(s => ({
+        id: s.id.toString(),
+        type: s.priorite === 'critique' ? 'emergency' : s.priorite === 'haute' ? 'urgent' : 'normal',
+        severity: s.priorite === 'critique' ? 'critical' : s.priorite === 'haute' ? 'high' : 'medium',
+        location: {
+          latitude: s.latitude,
+          longitude: s.longitude,
+          accuracy: 5,
+        },
+        timestamp: new Date(s.date_signalement),
+        description: s.description,
+        status: s.status === 'non traité' ? 'pending' : s.status === 'en cours' ? 'processing' : 'resolved',
+        userId: s.citoyen_id.toString(),
+        userName: s.citoyen ? `${s.citoyen.prenom} ${s.citoyen.nom}` : 'Citoyen',
+      }));
+
+      setAlerts(convertedAlerts);
+
+      // Convertir les zones de danger
+      const convertedDangerZones = apiDangerZones.map(z => ({
+        id: z.id.toString(),
+        name: z.nom,
+        type: z.type === 'high_crime' ? 'high_crime' : z.type === 'accident' ? 'accident' : 'construction',
+        center: {
+          latitude: z.latitude_centre,
+          longitude: z.longitude_centre,
+        },
+        radius: z.rayon,
+        severity: z.niveau_risque > 7 ? 'high' : z.niveau_risque > 4 ? 'medium' : 'low',
+        lastUpdate: new Date(z.dernier_incident),
+      }));
+
+      setDangerZones(convertedDangerZones);
+    } catch (error) {
+      console.error('Erreur lors du chargement des données:', error);
+      // Fallback sur les données simulées en cas d'erreur
+      setAlerts(mockAlerts);
+      setDangerZones(mockDangerZones);
+    }
+  };
 
   // Animation de pulsation continue
   const startPulseAnimation = () => {
@@ -356,9 +418,23 @@ export default function HomeScreen() {
         console.log('Enregistrement audio sauvegardé:', uri);
       }
 
-      // Création de l'alerte d'urgence
+      // Création du signalement d'urgence via l'API
+      const signalementData = {
+        description: 'URGENCE EXTRÊME - Enregistrements automatiques activés',
+        type: 'urgence',
+        priorite: 'critique',
+        latitude: userLocation ? userLocation.latitude : 14.7167,
+        longitude: userLocation ? userLocation.longitude : -17.4677,
+        adresse: userLocation ? 'Position actuelle' : 'Dakar, Sénégal',
+        medias: recording?.getURI() ? [{ type: 'audio', url: recording.getURI() }] : [],
+      };
+
+      // Envoyer le signalement via l'API
+      const newSignalement = await createSignalement(signalementData);
+
+      // Création de l'alerte locale pour l'affichage
       const emergencyAlert: AlertData = {
-        id: Date.now().toString(),
+        id: newSignalement.id.toString(),
         type: 'emergency',
         severity: 'critical',
         location: userLocation ? {
@@ -371,7 +447,7 @@ export default function HomeScreen() {
         videoRecording: 'video_emergency.mp4', // Simulation
         description: 'URGENCE EXTRÊME - Enregistrements automatiques activés',
         status: 'pending',
-        userId: 'current_user',
+        userId: newSignalement.citoyen_id.toString(),
         userName: 'Utilisateur',
       };
 

@@ -30,6 +30,7 @@ interface ApiContextType {
 
   // Méthodes pour les signalements
   fetchSignalements: () => Promise<void>;
+  fetchCitizenSignalements: () => Promise<void>;
   createSignalement: (signalementData: any) => Promise<Signalement>;
   updateSignalementStatus: (signalementId: number, status: string, notes?: string) => Promise<void>;
 
@@ -52,6 +53,9 @@ interface ApiContextType {
   capturePhoto: () => Promise<string>;
   recordVideo: () => Promise<string>;
   recordAudio: () => Promise<string>;
+
+  // Méthodes pour les zones de danger
+  fetchDangerZones: () => Promise<void>;
 
   // Méthodes utilitaires
   refreshData: () => Promise<void>;
@@ -80,6 +84,10 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
 
+  // État des zones de danger
+  const [dangerZones, setDangerZones] = useState<any[]>([]);
+  const [dangerZonesLoading, setDangerZonesLoading] = useState(false);
+
   // État du tracking
   const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
   const [trackingActive, setTrackingActive] = useState(false);
@@ -104,8 +112,9 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
         
         // Charger les données initiales
         await Promise.all([
-          fetchSignalements(),
+          currentUser.role === 'agent' ? fetchSignalements() : fetchCitizenSignalements(),
           fetchNotifications(),
+          fetchDangerZones(),
         ]);
 
         // Démarrer le tracking si c'est un agent
@@ -133,8 +142,9 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
 
       // Charger les données après connexion
       await Promise.all([
-        fetchSignalements(),
+        authResponse.user.role === 'agent' ? fetchSignalements() : fetchCitizenSignalements(),
         fetchNotifications(),
+        fetchDangerZones(),
       ]);
 
       // Démarrer le tracking si c'est un agent
@@ -178,6 +188,23 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
       setSignalementsError(null);
       
       const data = await apiService.getAgentSignalements();
+      setSignalements(data);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erreur lors du chargement des signalements';
+      setSignalementsError(errorMessage);
+    } finally {
+      setSignalementsLoading(false);
+    }
+  };
+
+  const fetchCitizenSignalements = async () => {
+    if (!isAuthenticated || user?.role !== 'citoyen') return;
+
+    try {
+      setSignalementsLoading(true);
+      setSignalementsError(null);
+      
+      const data = await apiService.getCitizenSignalements();
       setSignalements(data);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erreur lors du chargement des signalements';
@@ -353,14 +380,28 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
     }
   };
 
+  // Méthodes pour les zones de danger
+  const fetchDangerZones = async () => {
+    try {
+      setDangerZonesLoading(true);
+      const data = await apiService.getAllDangerZones();
+      setDangerZones(data);
+    } catch (error) {
+      console.error('Erreur lors du chargement des zones de danger:', error);
+    } finally {
+      setDangerZonesLoading(false);
+    }
+  };
+
   // Méthodes utilitaires
   const refreshData = async () => {
     if (!isAuthenticated) return;
 
     try {
       await Promise.all([
-        fetchSignalements(),
+        user?.role === 'agent' ? fetchSignalements() : fetchCitizenSignalements(),
         fetchNotifications(),
+        fetchDangerZones(),
       ]);
     } catch (error) {
       console.error('Erreur lors du rafraîchissement des données:', error);
@@ -440,6 +481,7 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
 
     // Méthodes pour les signalements
     fetchSignalements,
+    fetchCitizenSignalements,
     createSignalement,
     updateSignalementStatus,
 
@@ -462,6 +504,9 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
     capturePhoto,
     recordVideo,
     recordAudio,
+
+    // Méthodes pour les zones de danger
+    fetchDangerZones,
 
     // Méthodes utilitaires
     refreshData,

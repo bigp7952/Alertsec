@@ -1,29 +1,10 @@
-import React from 'react';
-import { useApiAuth } from '@/contexts/ApiAuthContext';
-import LoginForm from './LoginForm';
-import { Loader2 } from 'lucide-react';
+import { ReactNode } from 'react'
+import { Navigate } from 'react-router-dom'
+import { useAuth } from '@/contexts/AuthContext'
 
-interface AuthWrapperProps {
-  children: React.ReactNode;
-}
-
-export default function AuthWrapper({ children }: AuthWrapperProps) {
-  const { isAuthenticated, loading } = useApiAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p>Chargement...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <LoginForm />;
-  }
-
-  return <>{children}</>;
+export default function AuthWrapper({ children }: { children: ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth()
+  if (isLoading) return null
+  if (!isAuthenticated) return <Navigate to="/login" replace />
+  return <>{children}</>
 }

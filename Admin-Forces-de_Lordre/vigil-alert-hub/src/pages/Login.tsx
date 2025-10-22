@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import type { ButtonProps } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { 
@@ -8,7 +9,6 @@ import {
   EyeOff, 
   Lock, 
   User, 
-  Building2, 
   AlertTriangle,
   CheckCircle,
   Clock,
@@ -20,6 +20,7 @@ import { useNavigate } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import OTPLogin from '@/components/auth/OTPLogin'
 import { Logo } from '@/components/ui/logo'
+import apiService, { type User as ApiUser } from '@/lib/api'
 
 interface LoginStep {
   id: 'credentials' | '2fa' | 'otp' | 'success'
@@ -50,37 +51,14 @@ const LOGIN_STEPS: LoginStep[] = [
   }
 ]
 
-// Comptes de démonstration
-const DEMO_ACCOUNTS = [
-  {
-    matricule: 'POL001',
-    nom: 'Commissaire DIOP',
-    grade: 'Commissaire',
-    unite: 'Central',
-    role: 'admin'
-  },
-  {
-    matricule: 'POL002',
-    nom: 'Inspecteur FALL',
-    grade: 'Inspecteur',
-    unite: 'Brigade Mobile',
-    role: 'superviseur'
-  },
-  {
-    matricule: 'POL003',
-    nom: 'Agent SARR',
-    grade: 'Agent',
-    unite: 'Patrouille',
-    role: 'agent'
-  },
-  {
-    matricule: 'OPE001',
-    nom: 'Opérateur BA',
-    grade: 'Opérateur',
-    unite: 'Central Ops',
-    role: 'operateur'
-  }
-]
+// Interface pour les comptes de démonstration
+interface DemoAccount {
+  matricule: string;
+  nom: string;
+  grade: string;
+  unite: string;
+  role: string;
+}
 
 export default function Login() {
   const { login, verify2FA, isLoading } = useAuth()
@@ -88,6 +66,8 @@ export default function Login() {
   
   const [currentStep, setCurrentStep] = useState<'credentials' | '2fa' | 'otp' | 'success'>('credentials')
   const [loginMethod, setLoginMethod] = useState<'credentials' | 'otp'>('credentials')
+  const credVariant: ButtonProps['variant'] = loginMethod === 'credentials' ? 'default' : 'outline'
+  const otpVariant: ButtonProps['variant'] = loginMethod === 'otp' ? 'default' : 'outline'
   const [showPassword, setShowPassword] = useState(false)
   const [show2FAHelp, setShow2FAHelp] = useState(false)
   
@@ -104,6 +84,80 @@ export default function Login() {
   
   // Validation des champs
   const [errors, setErrors] = useState<Record<string, string>>({})
+  
+  // Comptes de démonstration récupérés depuis la base
+  const [demoAccounts, setDemoAccounts] = useState<DemoAccount[]>([])
+  const [loadingAccounts, setLoadingAccounts] = useState(true)
+
+  // Charger les comptes de démonstration depuis la base de données
+  useEffect(() => {
+    const loadDemoAccounts = async () => {
+      try {
+        setLoadingAccounts(true)
+        // Récupérer les utilisateurs directement via une requête publique
+        const baseURL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'
+        const response = await fetch(`${baseURL}/users/demo-accounts`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success) {
+            const accounts: DemoAccount[] = data.data.map((user: any) => ({
+              matricule: user.matricule,
+              nom: `${user.prenom} ${user.nom}`,
+              grade: user.grade,
+              unite: user.unite,
+              role: user.role
+            }))
+            setDemoAccounts(accounts)
+          } else {
+            throw new Error('Erreur API')
+          }
+        } else {
+          throw new Error('Erreur réseau')
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement des comptes:', error)
+        // Fallback avec les comptes connus
+        setDemoAccounts([
+          {
+            matricule: 'ADM001',
+            nom: 'Amadou Ndiaye',
+            grade: 'Commissaire Divisionnaire',
+            unite: 'Direction Générale',
+            role: 'admin'
+          },
+          {
+            matricule: 'SUP001',
+            nom: 'Moussa Diop',
+            grade: 'Lieutenant',
+            unite: 'Brigade de Sécurité',
+            role: 'superviseur'
+          },
+          {
+            matricule: 'SUP002',
+            nom: 'Fatou Sarr',
+            grade: 'Capitaine',
+            unite: 'Brigade de Sécurité',
+            role: 'superviseur'
+          },
+          {
+            matricule: 'SUP003',
+            nom: 'Ibrahima Fall',
+            grade: 'Lieutenant',
+            unite: 'Brigade de Sécurité',
+            role: 'superviseur'
+          }
+        ])
+      } finally {
+        setLoadingAccounts(false)
+      }
+    }
+
+    loadDemoAccounts()
+  }, [])
 
   const validateCredentials = () => {
     const newErrors: Record<string, string> = {}
@@ -116,9 +170,7 @@ export default function Login() {
       newErrors.motDePasse = 'Le mot de passe est requis'
     }
     
-    if (!credentials.codeService.trim()) {
-      newErrors.codeService = 'Le code service est requis'
-    }
+    // Code service est optionnel maintenant
     
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -129,13 +181,27 @@ export default function Login() {
     
     if (!validateCredentials()) return
     
+    // Réinitialiser les erreurs
+    setErrors({})
+    
     try {
-    const success = await login(credentials)
-    if (success) {
-      setCurrentStep('2fa')
+      console.log('Tentative de connexion avec:', credentials.matricule)
+      
+      const success = await login(credentials)
+      console.log('Résultat de connexion:', success)
+      
+      if (success) {
+        setCurrentStep('2fa')
+      } else {
+        setErrors({ 
+          general: 'Échec de la connexion. Vérifiez vos identifiants.' 
+        })
       }
-    } catch (error) {
-      console.error('Erreur de connexion:', error)
+    } catch (error: any) {
+      console.error('Erreur de connexion détaillée:', error)
+      setErrors({ 
+        general: error.message || 'Erreur de connexion. Vérifiez vos identifiants et que le serveur backend est accessible.' 
+      })
     }
   }
 
@@ -175,10 +241,10 @@ export default function Login() {
     setCurrentStep('credentials')
   }
 
-  const fillDemoCredentials = (account: typeof DEMO_ACCOUNTS[0]) => {
+  const fillDemoCredentials = (account: DemoAccount) => {
     setCredentials({
       matricule: account.matricule,
-      motDePasse: 'demo123',
+      motDePasse: 'demo', // Mot de passe par défaut pour les comptes de démo
       codeService: 'DEMO'
     })
   }
@@ -212,7 +278,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-lg">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
@@ -259,7 +325,7 @@ export default function Login() {
           <div className="mb-6">
             <div className="flex gap-2">
               <Button
-                variant={loginMethod === 'credentials' ? 'default' : 'outline'}
+                variant={credVariant}
                 onClick={() => setLoginMethod('credentials')}
                 className="flex-1"
               >
@@ -267,7 +333,7 @@ export default function Login() {
                 Identifiants
               </Button>
               <Button
-                variant={loginMethod === 'otp' ? 'default' : 'outline'}
+                variant={otpVariant}
                 onClick={() => setLoginMethod('otp')}
                 className="flex-1"
               >
@@ -334,7 +400,7 @@ export default function Login() {
 
                   <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Code service
+                    Code service (optionnel)
                     </label>
                       <Input
                         type="text"
@@ -347,6 +413,16 @@ export default function Login() {
                     <p className="text-red-500 text-xs mt-1">{errors.codeService}</p>
                     )}
                   </div>
+
+                  {/* Affichage des erreurs générales */}
+                  {errors.general && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 text-red-500" />
+                        <p className="text-sm text-red-700">{errors.general}</p>
+                      </div>
+                    </div>
+                  )}
 
                   <Button 
                     type="submit" 
@@ -369,22 +445,64 @@ export default function Login() {
 
                 {/* Comptes de démonstration */}
               <div className="mt-6">
-                <p className="text-xs text-gray-500 text-center mb-3">
-                  Comptes de démonstration :
+                <div className="text-center mb-4">
+                  <p className="text-sm font-medium text-gray-700 mb-1">
+                    Comptes de démonstration
                   </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {DEMO_ACCOUNTS.map((account) => (
-                    <Button
-                        key={account.matricule}
-                      variant="outline"
-                      size="sm"
-                        onClick={() => fillDemoCredentials(account)}
-                      className="text-xs"
-                    >
-                      {account.matricule}
-                    </Button>
-                    ))}
-                  </div>
+                  <p className="text-xs text-gray-500">
+                    Cliquez sur un compte pour remplir automatiquement les champs
+                  </p>
+                </div>
+                  {loadingAccounts ? (
+                    <div className="text-center py-2">
+                      <Clock className="h-4 w-4 animate-spin mx-auto mb-1" />
+                      <p className="text-xs text-gray-500">Chargement des comptes...</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-2">
+                      {demoAccounts.map((account) => (
+                      <Button
+                          key={account.matricule}
+                        variant="outline"
+                        size="sm"
+                          onClick={() => fillDemoCredentials(account)}
+                        className="w-full h-auto p-3 text-left justify-start hover:bg-blue-50 hover:border-blue-200 transition-colors"
+                        title={`Cliquer pour utiliser ${account.nom}`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-sm text-gray-900 truncate">
+                              {account.matricule}
+                            </div>
+                            <div className="text-xs text-gray-600 truncate mt-0.5">
+                              {account.nom}
+                            </div>
+                            <div className="text-xs text-gray-500 truncate">
+                              {account.grade}
+                            </div>
+                            <div className="text-xs text-gray-400 truncate">
+                              {account.unite}
+                            </div>
+                          </div>
+                          <div className="ml-2 flex-shrink-0">
+                            <Badge 
+                              variant={account.role === 'admin' ? 'destructive' : 'secondary'} 
+                              className="text-xs px-2 py-1"
+                            >
+                              {account.role}
+                            </Badge>
+                          </div>
+                        </div>
+                      </Button>
+                      ))}
+                      <div className="text-center mt-3 p-2 bg-gray-50 rounded-md">
+                        <p className="text-xs text-gray-600">
+                          <span className="font-medium">Mot de passe pour tous :</span> 
+                          <span className="ml-1 font-mono bg-gray-200 px-2 py-1 rounded text-gray-800">demo</span>
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
             </CardContent>
           </Card>
