@@ -171,8 +171,8 @@ export default function AlertsScreen() {
         urgency: s.priorite === 'critique' ? 'immediate' : s.priorite === 'haute' ? 'urgent' : 'normal',
       }));
 
-      setAlerts(convertedAlerts);
-      setFilteredAlerts(convertedAlerts);
+      setAlerts(convertedAlerts as AlertData[]);
+      setFilteredAlerts(convertedAlerts as AlertData[]);
     } catch (error) {
       console.error('Erreur lors du chargement des données:', error);
       // Fallback sur les données simulées
@@ -292,8 +292,8 @@ export default function AlertsScreen() {
             description: newAlert.description,
             category: newAlert.category,
             urgency: newAlert.urgency,
-            type: newAlert.urgency === 'immediate' ? 'emergency' : newAlert.urgency === 'urgent' ? 'urgent' : 'normal',
-            severity: newAlert.urgency === 'immediate' ? 'critical' : newAlert.urgency === 'urgent' ? 'high' : 'medium',
+            type: (newAlert.urgency === 'immediate' ? 'emergency' : newAlert.urgency === 'urgent' ? 'urgent' : 'normal') as 'emergency' | 'urgent' | 'normal',
+            severity: (newAlert.urgency === 'immediate' ? 'critical' : newAlert.urgency === 'urgent' ? 'high' : 'medium') as 'low' | 'medium' | 'high' | 'critical',
           }
         : alert
     );

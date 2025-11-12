@@ -27,9 +27,11 @@ const COLORS = {
   primaryDark: '#B91C1C',
   success: '#10B981',
   warning: '#F59E0B',
+  warningLight: '#FEF3C7',
   text: '#1F2937',
   textLight: '#6B7280',
   background: '#FFFFFF',
+  backgroundLight: '#F9FAFB',
   border: '#E5E7EB',
   white: '#FFFFFF',
 };
@@ -95,19 +97,26 @@ export default function LoginForceScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
       
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <Ionicons name="arrow-back" size={24} color={COLORS.textLight} />
-        </TouchableOpacity>
-      </View>
+      {/* Background Gradient */}
+      <LinearGradient
+        colors={['#EF4444', '#B91C1C']}
+        style={styles.backgroundGradient}
+      />
 
-      <ScrollView style={styles.scrollView}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backButton}
+          >
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+            <Text style={styles.backText}>Retour</Text>
+          </TouchableOpacity>
+        </View>
+
         <Animated.View
           style={[
             styles.content,
@@ -118,18 +127,13 @@ export default function LoginForceScreen() {
           ]}
         >
           
-          {/* Titre */}
-          <View style={styles.titleSection}>
+          {/* Logo et titre */}
+          <View style={styles.logoSection}>
             <View style={styles.logoContainer}>
-              <LinearGradient
-                colors={[COLORS.primary, COLORS.primaryDark]}
-                style={styles.logoGradient}
-              >
-                <Ionicons name="shield" size={32} color={COLORS.white} />
-              </LinearGradient>
+              <Ionicons name="shield" size={40} color="#EF4444" />
             </View>
             
-            <Text style={styles.title}>Connexion Force</Text>
+            <Text style={styles.title}>Forces de l'Ordre</Text>
             <Text style={styles.subtitle}>
               Accès réservé aux forces de l'ordre
             </Text>
@@ -139,70 +143,51 @@ export default function LoginForceScreen() {
           <View style={styles.formContainer}>
             
             {/* Matricule */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Matricule</Text>
-              <View style={[
-                styles.inputContainer,
-                { borderColor: focusedField === 'matricule' ? COLORS.primary : COLORS.border }
-              ]}>
-                <Ionicons name="card-outline" size={20} color={COLORS.textLight} />
-                <TextInput
-                  value={matricule}
-                  onChangeText={setMatricule}
-                  onFocus={() => setFocusedField('matricule')}
-                  onBlur={() => setFocusedField(null)}
-                  placeholder="Ex: POL12345"
-                  autoCapitalize="characters"
-                  style={styles.textInput}
-                />
-              </View>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Matricule *</Text>
+              <TextInput
+                value={matricule}
+                onChangeText={setMatricule}
+                placeholder="POL12345"
+                autoCapitalize="characters"
+                style={styles.input}
+                placeholderTextColor="#9CA3AF"
+              />
             </View>
 
             {/* Nom */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Nom de famille</Text>
-              <View style={[
-                styles.inputContainer,
-                { borderColor: focusedField === 'nom' ? COLORS.primary : COLORS.border }
-              ]}>
-                <Ionicons name="person-outline" size={20} color={COLORS.textLight} />
-                <TextInput
-                  value={nom}
-                  onChangeText={setNom}
-                  onFocus={() => setFocusedField('nom')}
-                  onBlur={() => setFocusedField(null)}
-                  placeholder="MARTIN"
-                  autoCapitalize="characters"
-                  style={styles.textInput}
-                />
-              </View>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Nom de famille *</Text>
+              <TextInput
+                value={nom}
+                onChangeText={setNom}
+                placeholder="MARTIN"
+                autoCapitalize="characters"
+                style={styles.input}
+                placeholderTextColor="#9CA3AF"
+              />
             </View>
 
             {/* Mot de passe */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Mot de passe</Text>
-              <View style={[
-                styles.inputContainer,
-                { borderColor: focusedField === 'password' ? COLORS.primary : COLORS.border }
-              ]}>
-                <Ionicons name="lock-closed-outline" size={20} color={COLORS.textLight} />
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Mot de passe *</Text>
+              <View style={styles.passwordContainer}>
                 <TextInput
                   value={password}
                   onChangeText={setPassword}
-                  onFocus={() => setFocusedField('password')}
-                  onBlur={() => setFocusedField(null)}
                   placeholder="••••••••"
                   secureTextEntry={!showPassword}
-                  style={styles.textInput}
+                  style={[styles.input, styles.passwordInput]}
+                  placeholderTextColor="#9CA3AF"
                 />
                 <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}
-                  style={styles.passwordToggle}
+                  style={styles.eyeButton}
                 >
                   <Ionicons 
-                    name={showPassword ? "eye-off-outline" : "eye-outline"} 
-                    size={20} 
-                    color={COLORS.textLight} 
+                    name={showPassword ? "eye-off" : "eye"}
+                    size={20}
+                    color="#9CA3AF"
                   />
                 </TouchableOpacity>
               </View>
@@ -228,37 +213,36 @@ export default function LoginForceScreen() {
           <TouchableOpacity
             onPress={handleLogin}
             disabled={isLoading}
-            style={[styles.submitButton, { opacity: isLoading ? 0.6 : 1 }]}
+            style={[
+              styles.loginButton,
+              isLoading && styles.loginButtonDisabled
+            ]}
+            activeOpacity={0.8}
           >
             <LinearGradient
-              colors={[COLORS.primary, COLORS.primaryDark]}
-              style={styles.submitGradient}
+              colors={isLoading ? ['#9CA3AF', '#9CA3AF'] : ['#EF4444', '#B91C1C']}
+              style={styles.buttonGradient}
             >
               {isLoading ? (
                 <View style={styles.loadingContainer}>
-                  <Animatable.View
-                    animation="rotate"
-                    iterationCount="infinite"
-                    duration={1000}
-                  >
-                    <Ionicons name="refresh" size={20} color={COLORS.white} />
-                  </Animatable.View>
-                  <Text style={styles.submitText}>Vérification...</Text>
+                  <LoadingSpinner />
+                  <Text style={styles.buttonText}>
+                    Vérification...
+                  </Text>
                 </View>
               ) : (
-                <View style={styles.submitContent}>
-                  <Text style={styles.submitText}>Accéder à l'interface</Text>
-                  <Ionicons name="shield-checkmark" size={20} color={COLORS.white} />
-                </View>
+                <Text style={styles.buttonText}>
+                  Accéder à l'interface
+                </Text>
               )}
             </LinearGradient>
           </TouchableOpacity>
 
           {/* Compte démo */}
           <View style={styles.demoContainer}>
-            <BlurView intensity={10} style={styles.demoBlur}>
+            <View style={styles.demoBlur}>
               <View style={styles.demoHeader}>
-                <Ionicons name="information-circle" size={16} color={COLORS.warning} />
+                <Ionicons name="information-circle" size={16} color="#F59E0B" />
                 <Text style={styles.demoTitle}>Compte de démonstration</Text>
               </View>
               <Text style={styles.demoText}>
@@ -266,7 +250,7 @@ export default function LoginForceScreen() {
                 Nom: DEMO{'\n'}
                 Mot de passe: demo123
               </Text>
-            </BlurView>
+            </View>
           </View>
 
         </Animated.View>
@@ -275,10 +259,44 @@ export default function LoginForceScreen() {
   );
 }
 
+// Composant de loading spinner
+function LoadingSpinner() {
+  const spinValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const spin = Animated.loop(
+      Animated.timing(spinValue, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      })
+    );
+    spin.start();
+    return () => spin.stop();
+  }, []);
+
+  const rotate = spinValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  return (
+    <Animated.View style={{ transform: [{ rotate }] }}>
+      <Text style={{ color: '#FFFFFF', fontSize: 18 }}>⭐</Text>
+    </Animated.View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+  },
+  backgroundGradient: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
   },
   header: {
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
@@ -286,8 +304,16 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 8,
     alignSelf: 'flex-start',
+  },
+  backText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   scrollView: {
     flex: 1,
@@ -296,128 +322,117 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 40,
   },
-  titleSection: {
+  logoSection: {
     alignItems: 'center',
     marginBottom: 40,
   },
   logoContainer: {
-    marginBottom: 16,
-    borderRadius: 25,
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: COLORS.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 8,
-      },
-    }),
-  },
-  logoGradient: {
-    width: 50,
-    height: 50,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '800',
-    color: COLORS.text,
+    color: '#FFFFFF',
     textAlign: 'center',
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '500',
-    color: COLORS.textLight,
+    color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
   },
   formContainer: {
-    gap: 20,
     marginBottom: 32,
   },
-  fieldContainer: {
-    gap: 8,
-  },
-  fieldLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.backgroundLight,
-    borderWidth: 1,
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 12,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#1F2937',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
-  textInput: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '500',
-    color: COLORS.text,
+  passwordContainer: {
+    position: 'relative',
   },
-  passwordToggle: {
+  passwordInput: {
+    paddingRight: 50,
+  },
+  eyeButton: {
+    position: 'absolute',
+    right: 16,
+    top: 14,
     padding: 4,
   },
   forgotPassword: {
     alignSelf: 'flex-end',
-    padding: 4,
+    padding: 8,
+    marginBottom: 20,
   },
   forgotPasswordText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
-    color: COLORS.primary,
+    color: '#FFFFFF',
   },
-  submitButton: {
+  loginButton: {
     borderRadius: 12,
     overflow: 'hidden',
     marginBottom: 24,
-    ...Platform.select({
-      ios: {
-        shadowColor: COLORS.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 6,
-      },
-    }),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
   },
-  submitGradient: {
+  loginButtonDisabled: {
+    opacity: 0.6,
+  },
+  buttonGradient: {
     paddingVertical: 16,
     alignItems: 'center',
+  },
+  buttonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  submitContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  submitText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.white,
-  },
   demoContainer: {
     borderRadius: 12,
     overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 16,
   },
   demoBlur: {
     paddingVertical: 16,
     paddingHorizontal: 20,
-    backgroundColor: COLORS.warningLight,
   },
   demoHeader: {
     flexDirection: 'row',
@@ -428,12 +443,12 @@ const styles = StyleSheet.create({
   demoTitle: {
     fontSize: 12,
     fontWeight: '700',
-    color: COLORS.warning,
+    color: '#F59E0B',
   },
   demoText: {
     fontSize: 11,
     fontWeight: '500',
-    color: COLORS.textLight,
+    color: 'rgba(255, 255, 255, 0.8)',
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
 });

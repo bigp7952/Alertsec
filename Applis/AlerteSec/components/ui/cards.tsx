@@ -202,7 +202,7 @@ export function ZoneCard({
       activeOpacity={0.8}
       className={`rounded-2xl shadow-sm border ${config.borderColor} mb-3 overflow-hidden`}
     >
-      <LinearGradient colors={config.gradient} className="p-4">
+      <LinearGradient colors={config.gradient as [string, string]} className="p-4">
         
         {/* Header */}
         <View className="flex-row items-center justify-between mb-3">

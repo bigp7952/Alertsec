@@ -99,8 +99,10 @@ export function NotificationIcon() {
 
   // Synchroniser les notifications locales avec Supabase
   useEffect(() => {
-    setLocalNotifications(notifications)
-  }, [notifications])
+    if (notifications && notifications.length > 0) {
+      setLocalNotifications(notifications)
+    }
+  }, [notifications?.length]) // Utiliser seulement la longueur pour éviter les boucles
 
   const unreadCount = localNotifications.filter(n => !n.lu).length
   const criticalCount = localNotifications.filter(n => n.type === 'error' && !n.lu).length

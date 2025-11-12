@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -10,38 +9,18 @@ import {
     Animated,
     KeyboardAvoidingView,
     Platform,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
-import * as Animatable from 'react-native-animatable';
-
-// Couleurs cohérentes
-const COLORS = {
-  primary: '#0091F5',
-  primaryLight: '#E6F4FE',
-  primaryDark: '#005793',
-  success: '#10B981',
-  successLight: '#D1FAE5',
-  warning: '#F59E0B',
-  warningLight: '#FEF3C7',
-  danger: '#EF4444',
-  dangerLight: '#FEF2F2',
-  text: '#1F2937',
-  textLight: '#6B7280',
-  background: '#FFFFFF',
-  backgroundLight: '#F9FAFB',
-  border: '#E5E7EB',
-  white: '#FFFFFF',
-};
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isEmailSent, setIsEmailSent] = useState(false);
-  const [focusedField, setFocusedField] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(0);
 
   // Animations
@@ -67,7 +46,7 @@ export default function ForgotPasswordScreen() {
 
   // Countdown pour renvoyer l'email
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (countdown > 0) {
       interval = setInterval(() => {
         setCountdown(prev => prev - 1);
@@ -135,283 +114,249 @@ export default function ForgotPasswordScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
       
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={async () => {
-            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.back();
-          }}
-          style={styles.backButton}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={24} color={COLORS.textLight} />
-        </TouchableOpacity>
-      </View>
+      {/* Background Gradient */}
+      <LinearGradient
+        colors={['#4F46E5', '#7C3AED']}
+        style={styles.backgroundGradient}
+      />
 
-      <Animated.View
-        style={[
-          styles.content,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          },
-        ]}
-      >
-        
-        {/* Section titre */}
-        <View style={styles.titleSection}>
-          <View style={styles.iconContainer}>
-            <LinearGradient
-              colors={[COLORS.primary, COLORS.primaryDark]}
-              style={styles.iconGradient}
-            >
-              <Ionicons 
-                name={isEmailSent ? "mail-open" : "key"} 
-                size={32} 
-                color={COLORS.white} 
-              />
-            </LinearGradient>
-          </View>
-          
-          <Text style={styles.title}>
-            {isEmailSent ? 'Email envoyé !' : 'Mot de passe oublié ?'}
-          </Text>
-          
-          <Text style={styles.subtitle}>
-            {isEmailSent 
-              ? 'Consultez votre boîte email pour réinitialiser votre mot de passe'
-              : 'Saisissez votre adresse email pour recevoir un lien de récupération'
-            }
-          </Text>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={async () => {
+              await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.back();
+            }}
+            style={styles.backButton}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+            <Text style={styles.backText}>Retour</Text>
+          </TouchableOpacity>
         </View>
 
-        {!isEmailSent ? (
-          // Formulaire de saisie email
-          <View style={styles.formContainer}>
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Adresse email</Text>
-              <View style={[
-                styles.inputContainer,
-                { 
-                  borderColor: focusedField === 'email' ? COLORS.primary : COLORS.border,
-                  borderWidth: focusedField === 'email' ? 2 : 1,
-                }
-              ]}>
-                <Ionicons name="mail-outline" size={20} color={COLORS.textLight} />
+        <Animated.View
+          style={[
+            styles.content,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
+          
+          {/* Logo et titre */}
+          <View style={styles.logoSection}>
+            <View style={styles.logoContainer}>
+              <Ionicons 
+                name={isEmailSent ? "mail-open" : "lock-closed"} 
+                size={40} 
+                color="#4F46E5" 
+              />
+            </View>
+            
+            <Text style={styles.title}>
+              {isEmailSent ? 'Email envoyé !' : 'Mot de passe oublié ?'}
+            </Text>
+            
+            <Text style={styles.subtitle}>
+              {isEmailSent 
+                ? 'Consultez votre boîte email pour réinitialiser votre mot de passe'
+                : 'Saisissez votre adresse email pour recevoir un lien de récupération'
+              }
+            </Text>
+          </View>
+
+          {!isEmailSent ? (
+            // Formulaire de saisie email
+            <View style={styles.formContainer}>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Adresse email *</Text>
                 <TextInput
                   value={email}
                   onChangeText={setEmail}
-                  onFocus={() => setFocusedField('email')}
-                  onBlur={() => setFocusedField(null)}
                   placeholder="votre.email@exemple.com"
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoComplete="email"
                   autoCorrect={false}
-                  style={styles.textInput}
+                  style={styles.input}
+                  placeholderTextColor="#9CA3AF"
                 />
               </View>
-            </View>
 
-            {/* Bouton d'envoi */}
-            <TouchableOpacity
-              onPress={handleSendResetEmail}
-              disabled={isLoading || !email.trim()}
-              style={[
-                styles.submitButton, 
-                { opacity: (isLoading || !email.trim()) ? 0.6 : 1 }
-              ]}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={[COLORS.primary, COLORS.primaryDark]}
-                style={styles.submitGradient}
+              {/* Bouton d'envoi */}
+              <TouchableOpacity
+                onPress={handleSendResetEmail}
+                disabled={isLoading || !email.trim()}
+                style={[
+                  styles.sendButton,
+                  { opacity: (isLoading || !email.trim()) ? 0.6 : 1 }
+                ]}
+                activeOpacity={0.8}
               >
-                {isLoading ? (
-                  <View style={styles.loadingContainer}>
-                    <Animatable.View
-                      animation="rotate"
-                      iterationCount="infinite"
-                      duration={1000}
-                    >
-                      <Ionicons name="refresh" size={20} color={COLORS.white} />
-                    </Animatable.View>
-                    <Text style={styles.submitText}>Envoi en cours...</Text>
-                  </View>
-                ) : (
-                  <View style={styles.submitContent}>
-                    <Text style={styles.submitText}>Envoyer le lien</Text>
-                    <Ionicons name="send" size={18} color={COLORS.white} />
-                  </View>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-
-            {/* Instructions de sécurité */}
-            <View style={styles.securityInfo}>
-              <BlurView intensity={15} style={styles.securityBlur}>
-                <View style={styles.securityHeader}>
-                  <Ionicons name="shield-checkmark" size={16} color={COLORS.success} />
-                  <Text style={styles.securityTitle}>Sécurité</Text>
-                </View>
-                
-                <View style={styles.securityList}>
-                  <View style={styles.securityItem}>
-                    <Ionicons name="checkmark-circle" size={12} color={COLORS.success} />
-                    <Text style={styles.securityText}>Lien valable 15 minutes</Text>
-                  </View>
-                  <View style={styles.securityItem}>
-                    <Ionicons name="checkmark-circle" size={12} color={COLORS.success} />
-                    <Text style={styles.securityText}>Usage unique seulement</Text>
-                  </View>
-                  <View style={styles.securityItem}>
-                    <Ionicons name="checkmark-circle" size={12} color={COLORS.success} />
-                    <Text style={styles.securityText}>Connexion sécurisée</Text>
-                  </View>
-                </View>
-              </BlurView>
+                <LinearGradient
+                  colors={isLoading ? ['#9CA3AF', '#9CA3AF'] : ['#4F46E5', '#7C3AED']}
+                  style={styles.buttonGradient}
+                >
+                  {isLoading ? (
+                    <View style={styles.loadingContainer}>
+                      <LoadingSpinner />
+                      <Text style={styles.buttonText}>Envoi en cours...</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.buttonText}>Envoyer le lien</Text>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
-          </View>
-        ) : (
-          // Écran de confirmation
-          <Animated.View
-            style={[
-              styles.confirmationContainer,
-              {
-                opacity: successAnim,
-                transform: [{
-                  scale: successAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.9, 1],
-                  }),
-                }],
-              },
-            ]}
-          >
-            {/* Email de confirmation */}
-            <View style={styles.emailConfirmation}>
-              <BlurView intensity={20} style={styles.emailBlur}>
+          ) : (
+            // Écran de confirmation
+            <Animated.View
+              style={[
+                styles.confirmationContainer,
+                {
+                  opacity: successAnim,
+                  transform: [{
+                    scale: successAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.9, 1],
+                    }),
+                  }],
+                },
+              ]}
+            >
+              {/* Email de confirmation */}
+              <View style={styles.emailConfirmation}>
                 <View style={styles.emailHeader}>
-                  <Ionicons name="mail" size={24} color={COLORS.primary} />
+                  <Ionicons name="mail" size={24} color="#4F46E5" />
                   <Text style={styles.emailTitle}>Email envoyé à :</Text>
                 </View>
                 <Text style={styles.emailAddress}>{email}</Text>
-              </BlurView>
-            </View>
+              </View>
 
-            {/* Instructions */}
-            <View style={styles.instructionsContainer}>
-              <Text style={styles.instructionsTitle}>Étapes suivantes :</Text>
-              
-              <View style={styles.stepsList}>
-                <View style={styles.step}>
-                  <View style={styles.stepNumber}>
-                    <Text style={styles.stepNumberText}>1</Text>
-                  </View>
-                  <Text style={styles.stepText}>Ouvrez votre boîte email</Text>
-                </View>
+              {/* Instructions */}
+              <View style={styles.instructionsContainer}>
+                <Text style={styles.instructionsTitle}>Étapes suivantes :</Text>
                 
-                <View style={styles.step}>
-                  <View style={styles.stepNumber}>
-                    <Text style={styles.stepNumberText}>2</Text>
+                <View style={styles.stepsList}>
+                  <View style={styles.step}>
+                    <View style={styles.stepNumber}>
+                      <Text style={styles.stepNumberText}>1</Text>
+                    </View>
+                    <Text style={styles.stepText}>Ouvrez votre boîte email</Text>
                   </View>
-                  <Text style={styles.stepText}>Cliquez sur le lien de récupération</Text>
-                </View>
-                
-                <View style={styles.step}>
-                  <View style={styles.stepNumber}>
-                    <Text style={styles.stepNumberText}>3</Text>
+                  
+                  <View style={styles.step}>
+                    <View style={styles.stepNumber}>
+                      <Text style={styles.stepNumberText}>2</Text>
+                    </View>
+                    <Text style={styles.stepText}>Cliquez sur le lien de récupération</Text>
                   </View>
-                  <Text style={styles.stepText}>Créez un nouveau mot de passe</Text>
+                  
+                  <View style={styles.step}>
+                    <View style={styles.stepNumber}>
+                      <Text style={styles.stepNumberText}>3</Text>
+                    </View>
+                    <Text style={styles.stepText}>Créez un nouveau mot de passe</Text>
+                  </View>
                 </View>
               </View>
-            </View>
 
-            {/* Bouton de renvoi */}
-            <View style={styles.resendContainer}>
-              <Text style={styles.resendText}>Vous n'avez pas reçu l'email ?</Text>
-              
+              {/* Bouton de renvoi */}
+              <View style={styles.resendContainer}>
+                <Text style={styles.resendText}>Vous n'avez pas reçu l'email ?</Text>
+                
+                <TouchableOpacity
+                  onPress={handleResendEmail}
+                  disabled={countdown > 0 || isLoading}
+                  style={[
+                    styles.resendButton,
+                    { opacity: (countdown > 0 || isLoading) ? 0.6 : 1 }
+                  ]}
+                  activeOpacity={0.7}
+                >
+                  {isLoading ? (
+                    <View style={styles.resendLoadingContainer}>
+                      <LoadingSpinner />
+                      <Text style={styles.resendButtonText}>Envoi...</Text>
+                    </View>
+                  ) : countdown > 0 ? (
+                    <View style={styles.countdownContainer}>
+                      <Ionicons name="time" size={16} color="#9CA3AF" />
+                      <Text style={styles.countdownText}>Renvoyer dans {countdown}s</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.resendContent}>
+                      <Text style={styles.resendButtonText}>Renvoyer l'email</Text>
+                      <Ionicons name="refresh" size={16} color="#4F46E5" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              {/* Bouton retour connexion */}
               <TouchableOpacity
-                onPress={handleResendEmail}
-                disabled={countdown > 0 || isLoading}
-                style={[
-                  styles.resendButton,
-                  { opacity: (countdown > 0 || isLoading) ? 0.6 : 1 }
-                ]}
-                activeOpacity={0.7}
+                onPress={async () => {
+                  await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.back();
+                }}
+                style={styles.backToLoginButton}
+                activeOpacity={0.8}
               >
-                {isLoading ? (
-                  <View style={styles.resendLoadingContainer}>
-                    <Animatable.View
-                      animation="rotate"
-                      iterationCount="infinite"
-                      duration={1000}
-                    >
-                      <Ionicons name="refresh" size={16} color={COLORS.primary} />
-                    </Animatable.View>
-                    <Text style={styles.resendButtonText}>Envoi...</Text>
-                  </View>
-                ) : countdown > 0 ? (
-                  <View style={styles.countdownContainer}>
-                    <Ionicons name="time" size={16} color={COLORS.textLight} />
-                    <Text style={styles.countdownText}>Renvoyer dans {countdown}s</Text>
-                  </View>
-                ) : (
-                  <View style={styles.resendContent}>
-                    <Text style={styles.resendButtonText}>Renvoyer l'email</Text>
-                    <Ionicons name="refresh" size={16} color={COLORS.primary} />
-                  </View>
-                )}
+                <Ionicons name="arrow-back" size={16} color="#9CA3AF" />
+                <Text style={styles.backToLoginText}>Retour à la connexion</Text>
               </TouchableOpacity>
-            </View>
+            </Animated.View>
+          )}
 
-            {/* Bouton retour connexion */}
-            <TouchableOpacity
-              onPress={async () => {
-                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.back();
-              }}
-              style={styles.backToLoginButton}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="arrow-back" size={16} color={COLORS.textLight} />
-              <Text style={styles.backToLoginText}>Retour à la connexion</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        )}
-
-        {/* Aide et support */}
-        <View style={styles.helpContainer}>
-          <BlurView intensity={10} style={styles.helpBlur}>
-            <View style={styles.helpHeader}>
-              <Ionicons name="help-circle" size={16} color={COLORS.warning} />
-              <Text style={styles.helpTitle}>Besoin d'aide ?</Text>
-            </View>
-            
-            <Text style={styles.helpText}>
-              Si vous rencontrez des difficultés, contactez notre support technique à{' '}
-              <Text style={styles.helpLink}>support@alertesec.fr</Text>
-            </Text>
-            
-            <TouchableOpacity style={styles.helpButton} activeOpacity={0.7}>
-              <Text style={styles.helpButtonText}>Contacter le support</Text>
-              <Ionicons name="arrow-forward" size={12} color={COLORS.primary} />
-            </TouchableOpacity>
-          </BlurView>
-        </View>
-
-      </Animated.View>
+        </Animated.View>
+      </ScrollView>
     </KeyboardAvoidingView>
+  );
+}
+
+// Composant de loading spinner
+function LoadingSpinner() {
+  const spinValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const spin = Animated.loop(
+      Animated.timing(spinValue, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      })
+    );
+    spin.start();
+    return () => spin.stop();
+  }, []);
+
+  const rotate = spinValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  return (
+    <Animated.View style={{ transform: [{ rotate }] }}>
+      <Text style={{ color: '#FFFFFF', fontSize: 18 }}>⭐</Text>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+  },
+  backgroundGradient: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
   },
   header: {
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
@@ -419,159 +364,100 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 8,
     alignSelf: 'flex-start',
   },
-  content: {
+  backText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  scrollView: {
     flex: 1,
+  },
+  content: {
     paddingHorizontal: 24,
     paddingBottom: 40,
   },
-  titleSection: {
+  logoSection: {
     alignItems: 'center',
     marginBottom: 40,
   },
-  iconContainer: {
-    marginBottom: 20,
-    borderRadius: 30,
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: COLORS.primary,
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.25,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 10,
-      },
-    }),
-  },
-  iconGradient: {
-    width: 60,
-    height: 60,
+  logoContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
   },
   title: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: '800',
-    color: COLORS.text,
+    color: '#FFFFFF',
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   subtitle: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: COLORS.textLight,
-    textAlign: 'center',
-    lineHeight: 22,
-    paddingHorizontal: 20,
-  },
-  formContainer: {
-    gap: 24,
-    marginBottom: 32,
-  },
-  fieldContainer: {
-    gap: 10,
-  },
-  fieldLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.backgroundLight,
-    borderRadius: 14,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    gap: 14,
-    ...Platform.select({
-      ios: {
-        shadowColor: COLORS.border,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
-  },
-  textInput: {
-    flex: 1,
     fontSize: 16,
     fontWeight: '500',
-    color: COLORS.text,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
   },
-  submitButton: {
-    borderRadius: 14,
+  formContainer: {
+    marginBottom: 32,
+  },
+  inputContainer: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#1F2937',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  sendButton: {
+    borderRadius: 12,
     overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: COLORS.primary,
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.3,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 8,
-      },
-    }),
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
   },
-  submitGradient: {
-    paddingVertical: 18,
+  buttonGradient: {
+    paddingVertical: 16,
     alignItems: 'center',
+  },
+  buttonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-  },
-  submitContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  submitText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.white,
-  },
-  securityInfo: {
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  securityBlur: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    backgroundColor: COLORS.successLight,
-  },
-  securityHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  securityTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.success,
-  },
-  securityList: {
-    gap: 8,
-  },
-  securityItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  securityText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: COLORS.textLight,
   },
   confirmationContainer: {
     gap: 32,
@@ -580,23 +466,10 @@ const styles = StyleSheet.create({
   emailConfirmation: {
     borderRadius: 16,
     overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: COLORS.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 6,
-      },
-    }),
-  },
-  emailBlur: {
-    paddingVertical: 20,
-    paddingHorizontal: 24,
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 20,
     alignItems: 'center',
+    marginBottom: 20,
   },
   emailHeader: {
     flexDirection: 'row',
@@ -607,20 +480,21 @@ const styles = StyleSheet.create({
   emailTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.primary,
+    color: '#FFFFFF',
   },
   emailAddress: {
     fontSize: 16,
     fontWeight: '700',
-    color: COLORS.text,
+    color: '#FFFFFF',
   },
   instructionsContainer: {
     gap: 16,
+    marginBottom: 20,
   },
   instructionsTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: COLORS.text,
+    color: '#FFFFFF',
   },
   stepsList: {
     gap: 16,
@@ -634,19 +508,19 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
   },
   stepNumberText: {
     fontSize: 12,
     fontWeight: '700',
-    color: COLORS.white,
+    color: '#4F46E5',
   },
   stepText: {
     fontSize: 14,
     fontWeight: '500',
-    color: COLORS.text,
+    color: 'rgba(255, 255, 255, 0.9)',
     flex: 1,
   },
   resendContainer: {
@@ -656,15 +530,15 @@ const styles = StyleSheet.create({
   resendText: {
     fontSize: 13,
     fontWeight: '500',
-    color: COLORS.textLight,
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   resendButton: {
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.backgroundLight,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   resendLoadingContainer: {
     flexDirection: 'row',
@@ -679,7 +553,7 @@ const styles = StyleSheet.create({
   countdownText: {
     fontSize: 13,
     fontWeight: '500',
-    color: COLORS.textLight,
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   resendContent: {
     flexDirection: 'row',
@@ -689,7 +563,7 @@ const styles = StyleSheet.create({
   resendButtonText: {
     fontSize: 13,
     fontWeight: '600',
-    color: COLORS.primary,
+    color: '#FFFFFF',
   },
   backToLoginButton: {
     flexDirection: 'row',
@@ -701,50 +575,6 @@ const styles = StyleSheet.create({
   backToLoginText: {
     fontSize: 14,
     fontWeight: '500',
-    color: COLORS.textLight,
-  },
-  helpContainer: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginTop: 20,
-  },
-  helpBlur: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    backgroundColor: COLORS.warningLight,
-  },
-  helpHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  helpTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.warning,
-  },
-  helpText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: COLORS.textLight,
-    lineHeight: 18,
-    marginBottom: 12,
-  },
-  helpLink: {
-    color: COLORS.primary,
-    fontWeight: '600',
-    textDecorationLine: 'underline',
-  },
-  helpButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  helpButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.primary,
+    color: 'rgba(255, 255, 255, 0.8)',
   },
 });
-

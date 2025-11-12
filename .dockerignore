@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+vendor/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist/
+build/
+*.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker
+docker-compose.yml
+Dockerfile
+.dockerignore
+
+# Laravel specific
+BackendAlertsec/storage/logs/*
+BackendAlertsec/storage/framework/cache/*
+BackendAlertsec/storage/framework/sessions/*
+BackendAlertsec/storage/framework/views/*
+BackendAlertsec/bootstrap/cache/*
+
+# Keep storage structure but ignore content
+!BackendAlertsec/storage/logs/.gitignore
+!BackendAlertsec/storage/framework/cache/.gitignore
+!BackendAlertsec/storage/framework/sessions/.gitignore
+!BackendAlertsec/storage/framework/views/.gitignore
+!BackendAlertsec/bootstrap/cache/.gitignore
+

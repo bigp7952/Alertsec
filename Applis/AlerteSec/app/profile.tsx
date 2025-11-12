@@ -404,7 +404,7 @@ export default function ProfileScreen() {
   const renderActions = () => (
     <View style={styles.actionsContainer}>
       <TouchableOpacity
-        onPress={() => router.push('/help')}
+        onPress={() => Alert.alert('Aide', 'Fonctionnalité en cours de développement')}
         style={styles.actionButton}
       >
         <LinearGradient
@@ -417,7 +417,7 @@ export default function ProfileScreen() {
       </TouchableOpacity>
       
       <TouchableOpacity
-        onPress={() => router.push('/about')}
+        onPress={() => Alert.alert('À propos', 'Fonctionnalité en cours de développement')}
         style={styles.actionButton}
       >
         <LinearGradient

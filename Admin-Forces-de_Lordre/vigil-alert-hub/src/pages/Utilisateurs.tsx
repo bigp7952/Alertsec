@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Users, Search, Shield, MapPin, Briefcase, RefreshCw, Crown, UserCheck } from 'lucide-react'
+import { Users, Search, MapPin, Briefcase, RefreshCw, Crown, UserCheck } from 'lucide-react'
+import { Logo } from '@/components/ui/logo'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 export default function Utilisateurs() {
@@ -160,7 +161,7 @@ export default function Utilisateurs() {
             <Card key={u.id} className={`hover:shadow transition-shadow border-l-4 ${'bg-card border-border '}` + (u.role === 'admin' ? 'border-l-primary' : u.role === 'superviseur' ? 'border-l-secondary' : u.role === 'agent' ? 'border-l-success' : 'border-l-accent')}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Shield className="h-4 w-4" /> {u.prenom} {u.nom}
+                  <Logo size="sm" className="h-4 w-4" /> {u.prenom} {u.nom}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
@@ -198,7 +199,7 @@ function AddAgentButton({ onCreated }: { onCreated: (u: User) => void }) {
     try {
       setSaving(true)
       setError(null)
-      const res = await fetch(`${(import.meta as any).env?.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'}/agents`, {
+      const res = await fetch(`${(import.meta as any).env?.VITE_API_BASE_URL || 'http://172.20.10.4:8000/api'}/agents`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

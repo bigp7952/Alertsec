@@ -12,6 +12,11 @@ export interface Signalement {
     nom: string
   }
   photo?: string | null
+  medias?: {
+    photos?: string[]
+    videos?: string[]
+    audios?: string[]
+  }
   created_at: string
   agent_assigne?: string
   updated_at: string

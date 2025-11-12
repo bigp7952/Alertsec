@@ -200,54 +200,73 @@ export default function HomeScreen() {
       return;
     }
 
+    // Charger les données mock immédiatement pour l'affichage
+    setAlerts(mockAlerts);
+    setDangerZones(mockDangerZones);
+
     requestPermissions();
     loadRealData();
     startPulseAnimation();
   }, [isAuthenticated, userType]);
 
-  // Charger les vraies données
+  // Synchroniser les données du contexte quand elles changent
+  useEffect(() => {
+    if (signalements && signalements.length > 0) {
+      const convertedAlerts = signalements.map((s: any) => ({
+        id: s.id?.toString() || `sig_${Date.now()}_${Math.random()}`,
+        type: s.priorite === 'critique' ? 'emergency' : s.priorite === 'haute' ? 'urgent' : 'normal',
+        severity: s.priorite === 'critique' ? 'critical' : s.priorite === 'haute' ? 'high' : 'medium',
+        location: {
+          latitude: s.latitude || 14.7167,
+          longitude: s.longitude || -17.4677,
+          accuracy: 5,
+        },
+        timestamp: s.date_signalement ? new Date(s.date_signalement) : new Date(),
+        description: s.description || 'Signalement',
+        status: s.status === 'non traité' ? 'pending' : s.status === 'en cours' ? 'processing' : 'resolved',
+        userId: s.citoyen_id?.toString() || 'user1',
+        userName: s.citoyen ? `${s.citoyen.prenom || ''} ${s.citoyen.nom || ''}`.trim() : 'Citoyen',
+      }));
+      setAlerts(convertedAlerts as AlertData[]);
+    } else if (signalements.length === 0) {
+      // Utiliser les données mock si pas de données du contexte
+      setAlerts(mockAlerts);
+    }
+  }, [signalements]);
+
+  // Synchroniser les zones de danger du contexte
+  useEffect(() => {
+    if (apiDangerZones && apiDangerZones.length > 0) {
+      const convertedDangerZones = apiDangerZones.map((z: any) => ({
+        id: z.id?.toString() || `zone_${Date.now()}_${Math.random()}`,
+        name: z.nom || 'Zone de danger',
+        type: (z.type === 'high_crime' ? 'high_crime' : z.type === 'accident' ? 'accident' : 'construction') as 'high_crime' | 'accident' | 'construction' | 'event',
+        center: {
+          latitude: z.latitude_centre || z.latitude || 14.7167,
+          longitude: z.longitude_centre || z.longitude || -17.4677,
+        },
+        radius: z.rayon || 200,
+        severity: (z.niveau_risque > 7 ? 'high' : z.niveau_risque > 4 ? 'medium' : 'low') as 'low' | 'medium' | 'high',
+        lastUpdate: z.dernier_incident ? new Date(z.dernier_incident) : new Date(),
+      }));
+      setDangerZones(convertedDangerZones as DangerZone[]);
+    } else if (apiDangerZones.length === 0) {
+      // Utiliser les données mock si pas de données du contexte
+      setDangerZones(mockDangerZones);
+    }
+  }, [apiDangerZones]);
+
+  // Charger les données du contexte (les useEffect se chargeront de l'affichage)
   const loadRealData = async () => {
     try {
-      // Charger les signalements et zones de danger
+      // Charger les signalements et zones de danger du contexte
       await Promise.all([
         fetchCitizenSignalements(),
         fetchDangerZones(),
       ]);
-
-      // Convertir les signalements en format AlertData
-      const convertedAlerts = signalements.map(s => ({
-        id: s.id.toString(),
-        type: s.priorite === 'critique' ? 'emergency' : s.priorite === 'haute' ? 'urgent' : 'normal',
-        severity: s.priorite === 'critique' ? 'critical' : s.priorite === 'haute' ? 'high' : 'medium',
-        location: {
-          latitude: s.latitude,
-          longitude: s.longitude,
-          accuracy: 5,
-        },
-        timestamp: new Date(s.date_signalement),
-        description: s.description,
-        status: s.status === 'non traité' ? 'pending' : s.status === 'en cours' ? 'processing' : 'resolved',
-        userId: s.citoyen_id.toString(),
-        userName: s.citoyen ? `${s.citoyen.prenom} ${s.citoyen.nom}` : 'Citoyen',
-      }));
-
-      setAlerts(convertedAlerts);
-
-      // Convertir les zones de danger
-      const convertedDangerZones = apiDangerZones.map(z => ({
-        id: z.id.toString(),
-        name: z.nom,
-        type: z.type === 'high_crime' ? 'high_crime' : z.type === 'accident' ? 'accident' : 'construction',
-        center: {
-          latitude: z.latitude_centre,
-          longitude: z.longitude_centre,
-        },
-        radius: z.rayon,
-        severity: z.niveau_risque > 7 ? 'high' : z.niveau_risque > 4 ? 'medium' : 'low',
-        lastUpdate: new Date(z.dernier_incident),
-      }));
-
-      setDangerZones(convertedDangerZones);
+      
+      // Les données seront automatiquement synchronisées par les useEffect ci-dessus
+      // Si aucune donnée n'est disponible, les données mock seront utilisées
     } catch (error) {
       console.error('Erreur lors du chargement des données:', error);
       // Fallback sur les données simulées en cas d'erreur

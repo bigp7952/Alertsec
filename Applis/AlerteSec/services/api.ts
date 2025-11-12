@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import * as MediaLibrary from 'expo-media-library';
+import { authService } from './authService';
 
 // Configuration de l'API
 const API_BASE_URL = 'http://localhost:8000/api';
@@ -499,6 +500,123 @@ class ApiService {
   async sendPushToken(token: string): Promise<void> {
     // Ici vous devriez envoyer le token FCM au serveur
     console.log('Envoi du token push:', token);
+  }
+
+  /**
+   * Fait une requête HTTP authentifiée
+   */
+  async makeAuthenticatedRequest(
+    endpoint: string,
+    options: RequestInit = {}
+  ): Promise<Response> {
+    const token = authService.getCurrentToken();
+    
+    if (!token) {
+      throw new Error('Non authentifié');
+    }
+
+    const defaultHeaders = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    };
+
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers: {
+        ...defaultHeaders,
+        ...options.headers,
+      },
+    });
+
+    // Si la réponse est 401, essayer de rafraîchir la session
+    if (response.status === 401) {
+      const sessionValid = await authService.refreshSession();
+      if (!sessionValid) {
+        throw new Error('Session expirée');
+      }
+      
+      // Retry avec le nouveau token
+      const newToken = authService.getCurrentToken();
+      if (newToken) {
+        return fetch(`${API_BASE_URL}${endpoint}`, {
+          ...options,
+          headers: {
+            ...defaultHeaders,
+            'Authorization': `Bearer ${newToken}`,
+            ...options.headers,
+          },
+        });
+      }
+    }
+
+    return response;
+  }
+
+  /**
+   * Récupère les données avec authentification
+   */
+  async get(endpoint: string): Promise<any> {
+    const response = await this.makeAuthenticatedRequest(endpoint, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.message || 'Erreur de requête');
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Envoie des données avec authentification
+   */
+  async post(endpoint: string, data: any): Promise<any> {
+    const response = await this.makeAuthenticatedRequest(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.message || 'Erreur de requête');
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Met à jour des données avec authentification
+   */
+  async put(endpoint: string, data: any): Promise<any> {
+    const response = await this.makeAuthenticatedRequest(endpoint, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.message || 'Erreur de requête');
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Supprime des données avec authentification
+   */
+  async delete(endpoint: string): Promise<any> {
+    const response = await this.makeAuthenticatedRequest(endpoint, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.message || 'Erreur de requête');
+    }
+
+    return response.json();
   }
 }
 

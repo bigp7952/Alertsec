@@ -75,3 +75,9 @@ class SignalementAssigne implements ShouldBroadcast
 
 
 
+
+
+
+
+
+

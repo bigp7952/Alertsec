@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge"
 import { 
   MapPin, 
   AlertTriangle, 
-  Shield, 
   Clock, 
   Users,
   TrendingUp,
@@ -344,7 +343,7 @@ export default function DangerZones({
     switch (type) {
       case 'critical': return <AlertTriangle className="h-4 w-4" />
       case 'medium': return <AlertTriangle className="h-4 w-4" />
-      case 'safe': return <Shield className="h-4 w-4" />
+      case 'safe': return <Logo size="sm" className="h-4 w-4" />
       default: return <MapPin className="h-4 w-4" />
     }
   }

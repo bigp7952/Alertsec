@@ -205,7 +205,25 @@ tramp
 ehthumbs.db
 Thumbs.db
 
-# Package managers
-package-lock.json
-yarn.lock
-composer.lock
+# Package managers (keep lock files for consistency)
+# package-lock.json
+# yarn.lock
+# composer.lock
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Documentation temporaire (à nettoyer après réorganisation)
+# Les fichiers .md de correction/test seront déplacés dans docs/
+
+# Test files
+test-*.js
+*-test.js
+*.test.js
+*.spec.js
+
+# Build artifacts
+*.map
+*.min.js
+*.min.css

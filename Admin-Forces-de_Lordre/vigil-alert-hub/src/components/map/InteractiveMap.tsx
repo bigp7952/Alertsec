@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { MapContainer, TileLayer, Polygon, Marker, Popup, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Polygon, Marker, Popup, useMap, Circle } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { Badge } from '@/components/ui/badge'
@@ -26,6 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import apiService from '@/lib/api'
 
 // Fix pour les icônes Leaflet dans Vite
 delete (L.Icon.Default.prototype as any)._getIconUrl
@@ -34,6 +35,35 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 })
+
+// Interface pour les signalements
+interface Signalement {
+  id: number
+  type: string
+  gravite?: string
+  description: string
+  latitude: number
+  longitude: number
+  statut: string
+  created_at: string
+  user?: {
+    nom: string
+    prenom: string
+  }
+}
+
+// Interface pour les zones dangereuses
+interface ZoneDangereuse {
+  id: number
+  nom: string
+  type: string
+  latitude: number
+  longitude: number
+  rayon: number
+  description: string
+  niveau_danger: string
+  created_at: string
+}
 
 // Définition des zones de signalement avec coordonnées réalistes de Dakar
 const signalementZones = [
@@ -355,6 +385,71 @@ export default function InteractiveMap({
   onSignalementClick 
 }: InteractiveMapProps) {
   const mapRef = useRef<L.Map>(null)
+  const [signalements, setSignalements] = useState<Signalement[]>([])
+  const [agents, setAgents] = useState<Agent[]>([])
+  const [zonesDangereuses, setZonesDangereuses] = useState<ZoneDangereuse[]>([])
+  const [loading, setLoading] = useState(true)
+  const { toast } = useToast()
+
+  // Récupération des données depuis l'API
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        
+        // Récupérer les signalements
+        const signalementsData = await apiService.getSignalements()
+        setSignalements(signalementsData || [])
+        
+        // Récupérer les agents
+        const agentsData = await apiService.getAgents()
+        setAgents(agentsData || [])
+        
+        // Récupérer les zones dangereuses
+        const zonesData = await apiService.getZonesDangereuses()
+        setZonesDangereuses(zonesData || [])
+        
+      } catch (error) {
+        console.error('Erreur lors du chargement des données:', error)
+        toast({
+          title: "Erreur",
+          description: "Impossible de charger les données de la carte",
+          variant: "destructive"
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+    
+    // Actualiser les données toutes les 30 secondes
+    const interval = setInterval(fetchData, 30000)
+    return () => clearInterval(interval)
+  }, [toast])
+
+  // Fonction pour obtenir la couleur selon la gravité
+  const getGravityColor = (gravite: string) => {
+    switch (gravite?.toLowerCase()) {
+      case 'critique':
+      case 'critical':
+      case 'urgent':
+        return '#DC2626' // Rouge vif
+      case 'moyen':
+      case 'medium':
+      case 'modere':
+        return '#F59E0B' // Orange
+      case 'faible':
+      case 'low':
+      case 'mineur':
+        return '#10B981' // Vert
+      case 'information':
+      case 'info':
+        return '#3B82F6' // Bleu
+      default:
+        return '#6B7280' // Gris
+    }
+  }
 
   // Fonction pour obtenir la couleur selon le type
   const getZoneColor = (type: string, isHighlighted: boolean = false) => {
@@ -426,8 +521,26 @@ export default function InteractiveMap({
     ? signalementZones.find(zone => zone.nom === highlightLocation)
     : null
 
+  if (loading) {
+    return (
+      <div className="relative w-full h-full flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-sm text-muted-foreground">Chargement de la carte...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="relative w-full h-full">
+      <style jsx>{`
+        @keyframes pulse {
+          0% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.1); opacity: 0.8; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+      `}</style>
       <MapContainer
         center={highlightedZone ? highlightedZone.centre : centerDakar}
         zoom={zoomLevel}
@@ -453,20 +566,40 @@ export default function InteractiveMap({
           highlightLocation={highlightLocation}
         />
         
-        {/* Zones de signalement */}
-        {signalementZones.map((zone) => {
-          const isHighlighted = highlightLocation === zone.nom || activityId === zone.id
-          const zoneStyle = getZoneColor(zone.type, isHighlighted)
+        {/* Marqueurs des signalements */}
+        {signalements.map((signalement) => {
+          const isHighlighted = activityId === signalement.id
+          const markerColor = getGravityColor(signalement.gravite || signalement.type)
+          const iconSize = signalement.gravite === 'critique' || signalement.gravite === 'critical' ? 25 : 20
           
           return (
-            <Polygon
-              key={zone.id}
-              positions={zone.zone}
-              pathOptions={zoneStyle}
+            <Marker
+              key={signalement.id}
+              position={[signalement.latitude, signalement.longitude]}
+              icon={L.divIcon({
+                className: 'custom-marker',
+                html: `<div style="
+                  background-color: ${markerColor};
+                  width: ${iconSize}px;
+                  height: ${iconSize}px;
+                  border-radius: 50%;
+                  border: 3px solid white;
+                  box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  color: white;
+                  font-size: ${iconSize > 20 ? '14px' : '12px'};
+                  font-weight: bold;
+                  animation: ${signalement.gravite === 'critique' ? 'pulse 2s infinite' : 'none'};
+                ">!</div>`,
+                iconSize: [iconSize, iconSize],
+                iconAnchor: [iconSize/2, iconSize/2]
+              })}
               eventHandlers={{
                 click: () => {
                   if (onSignalementClick) {
-                    onSignalementClick(zone)
+                    onSignalementClick(signalement)
                   }
                 },
               }}
@@ -474,88 +607,176 @@ export default function InteractiveMap({
               <Popup>
                 <div className="p-2 min-w-64">
                   <div className="flex items-start gap-3">
-                    <div className={`w-3 h-3 rounded-full mt-1 ${
-                      zone.type === 'critical' ? 'bg-danger-critical' :
-                      zone.type === 'medium' ? 'bg-danger-medium' : 'bg-safe-zone'
-                    }`} />
+                    <div className={`w-3 h-3 rounded-full mt-1`} 
+                         style={{ backgroundColor: markerColor }} />
                     <div className="flex-1">
-                      <h3 className="font-semibold text-sm">{zone.nom}</h3>
-                      <p className="text-xs text-muted-foreground mb-2">{zone.description}</p>
+                      <h3 className="font-semibold text-sm">Signalement #{signalement.id}</h3>
+                      <p className="text-xs text-muted-foreground mb-2">{signalement.description}</p>
                       
                       <div className="space-y-1 text-xs">
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          <span>{zone.time}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-2">
                           <User className="h-3 w-3" />
-                          <span>{zone.reporter}</span>
+                          <span>{signalement.user?.prenom} {signalement.user?.nom}</span>
                         </div>
-                      </div>
-                      
-                      <div className="flex items-center justify-between mt-3">
-                        <Badge variant={getStatusVariant(zone.status)} className="text-2xs">
-                          {getStatusLabel(zone.status)}
-                        </Badge>
-                        
-                        {zone.status !== 'traite' && (
-                          <InterventionDialog zone={zone} />
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-3 w-3" />
+                          <span>{new Date(signalement.created_at).toLocaleString()}</span>
+                        </div>
+                        {signalement.gravite && (
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="h-3 w-3" />
+                            <span className="font-medium" style={{ color: markerColor }}>
+                              Gravité: {signalement.gravite}
+                            </span>
+                          </div>
                         )}
+                        <div className="mt-2">
+                          <Badge 
+                            variant={getStatusVariant(signalement.statut)}
+                            className="text-2xs"
+                          >
+                            {getStatusLabel(signalement.statut)}
+                          </Badge>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </Popup>
-            </Polygon>
+            </Marker>
+          )
+        })}
+        
+        {/* Zones dangereuses */}
+        {zonesDangereuses.map((zone) => {
+          const zoneColor = getGravityColor(zone.niveau_danger)
+          const circleRadius = zone.rayon || 100 // Rayon en mètres
+          
+          return (
+            <Circle
+              key={zone.id}
+              center={[zone.latitude, zone.longitude]}
+              radius={circleRadius}
+              pathOptions={{
+                color: zoneColor,
+                fillColor: zoneColor,
+                fillOpacity: 0.2,
+                weight: 2,
+                opacity: 0.6
+              }}
+            >
+              <Popup>
+                <div className="p-2">
+                  <h3 className="font-semibold text-sm">{zone.nom}</h3>
+                  <p className="text-xs text-muted-foreground mb-2">{zone.description}</p>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-3 w-3" />
+                      <span className="font-medium" style={{ color: zoneColor }}>
+                        Niveau: {zone.niveau_danger}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-3 w-3" />
+                      <span>{new Date(zone.created_at).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              </Popup>
+            </Circle>
           )
         })}
         
         {/* Marqueurs des agents */}
-        {agentsPositions.map((agent) => (
+        {agents.filter(agent => agent.latitude && agent.longitude).map((agent) => {
+          const agentColor = agent.statut === 'disponible' ? '#10B981' : 
+                           agent.statut === 'en_mission' ? '#F59E0B' : '#6B7280'
+          
+          return (
           <Marker
             key={agent.id}
-            position={agent.position}
-            icon={createAgentIcon(agent.status)}
+              position={[agent.latitude!, agent.longitude!]}
+              icon={L.divIcon({
+                className: 'agent-marker',
+                html: `<div style="
+                  background-color: ${agentColor};
+                  width: 24px;
+                  height: 24px;
+                  border-radius: 50%;
+                  border: 3px solid white;
+                  box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  color: white;
+                  font-size: 14px;
+                  font-weight: bold;
+                ">👮</div>`,
+                iconSize: [24, 24],
+                iconAnchor: [12, 12]
+              })}
           >
             <Popup>
               <div className="p-2">
-                <h3 className="font-semibold text-sm">{agent.nom}</h3>
+                  <h3 className="font-semibold text-sm">{agent.prenom} {agent.nom}</h3>
                 <p className="text-xs text-muted-foreground">Secteur {agent.secteur}</p>
                 <Badge 
-                  variant={agent.status === 'disponible' ? 'success' : 'warning'}
+                    variant={agent.statut === 'disponible' ? 'success' : 'warning'}
                   className="text-2xs mt-1"
                 >
-                  {agent.status === 'disponible' ? 'Disponible' : 'En mission'}
+                    {agent.statut === 'disponible' ? 'Disponible' : 'En mission'}
                 </Badge>
               </div>
             </Popup>
           </Marker>
-        ))}
+          )
+        })}
       </MapContainer>
       
       {/* Légende */}
       <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm rounded-lg p-3 shadow-lg z-10">
         <h4 className="text-xs font-semibold mb-2">Légende</h4>
         <div className="space-y-1">
+          <div className="text-xs font-medium text-gray-600 mb-1">Signalements</div>
           <div className="flex items-center gap-2 text-xs">
-            <div className="w-3 h-3 bg-danger-critical rounded border"></div>
-            <span>Critique</span>
+            <div className="w-3 h-3 rounded-full border-2 border-white" style={{ backgroundColor: '#DC2626' }}></div>
+            <span>Critique/Urgent</span>
           </div>
           <div className="flex items-center gap-2 text-xs">
-            <div className="w-3 h-3 bg-danger-medium rounded border"></div>
-            <span>Moyen</span>
+            <div className="w-3 h-3 rounded-full border-2 border-white" style={{ backgroundColor: '#F59E0B' }}></div>
+            <span>Moyen/Modéré</span>
           </div>
           <div className="flex items-center gap-2 text-xs">
-            <div className="w-3 h-3 bg-safe-zone rounded border"></div>
-            <span>Sécurisé</span>
+            <div className="w-3 h-3 rounded-full border-2 border-white" style={{ backgroundColor: '#10B981' }}></div>
+            <span>Faible/Mineur</span>
           </div>
           <div className="flex items-center gap-2 text-xs">
-            <div className="w-3 h-3 bg-safe-zone rounded-full border-2 border-white"></div>
-            <span>Agent libre</span>
+            <div className="w-3 h-3 rounded-full border-2 border-white" style={{ backgroundColor: '#3B82F6' }}></div>
+            <span>Information</span>
+          </div>
+          
+          <div className="text-xs font-medium text-gray-600 mb-1 mt-2">Agents</div>
+          <div className="flex items-center gap-2 text-xs">
+            <div className="w-3 h-3 rounded-full border-2 border-white" style={{ backgroundColor: '#10B981' }}></div>
+            <span>👮 Disponible</span>
           </div>
           <div className="flex items-center gap-2 text-xs">
-            <div className="w-3 h-3 bg-danger-medium rounded-full border-2 border-white"></div>
-            <span>Agent occupé</span>
+            <div className="w-3 h-3 rounded-full border-2 border-white" style={{ backgroundColor: '#F59E0B' }}></div>
+            <span>👮 En mission</span>
+          </div>
+          
+          <div className="text-xs font-medium text-gray-600 mb-1 mt-2">Zones dangereuses</div>
+          <div className="flex items-center gap-2 text-xs">
+            <div className="w-3 h-3 rounded-full border-2 border-white" style={{ backgroundColor: '#DC2626' }}></div>
+            <span>Zone critique</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <div className="w-3 h-3 rounded-full border-2 border-white" style={{ backgroundColor: '#F59E0B' }}></div>
+            <span>Zone moyenne</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <div className="w-3 h-3 rounded-full border-2 border-white" style={{ backgroundColor: '#10B981' }}></div>
+            <span>Zone sûre</span>
           </div>
         </div>
       </div>

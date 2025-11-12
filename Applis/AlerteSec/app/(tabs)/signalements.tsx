@@ -42,6 +42,7 @@ export default function SignalementsScreen() {
   const [filter, setFilter] = useState<'tous' | 'en_cours' | 'resolu'>('tous');
 
   useEffect(() => {
+    // Charger les signalements au montage du composant
     fetchCitizenSignalements();
   }, []);
 

@@ -1,4 +1,5 @@
 import { PrimaryButton } from '@/components/ui/buttons';
+import { useApi } from '@/contexts/ApiContext';
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -29,6 +30,7 @@ const NIVEAUX_GRAVITE = [
 ];
 
 export default function NouveauSignalementScreen() {
+  const { createSignalement } = useApi();
   const [type, setType] = useState('');
   const [gravite, setGravite] = useState('');
   const [description, setDescription] = useState('');
@@ -69,8 +71,26 @@ export default function NouveauSignalementScreen() {
 
     setIsLoading(true);
 
-    // Simulation de l'envoi
-    setTimeout(() => {
+    try {
+      // Convertir le type et la gravité au format attendu
+      const prioriteMap: { [key: string]: string } = {
+        'critique': 'critique',
+        'moyen': 'haute',
+        'mineur': 'moyenne'
+      };
+
+      const signalementData = {
+        description: description || `Signalement de type ${type}`,
+        type: type,
+        priorite: prioriteMap[gravite] || 'moyenne',
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        adresse: `Lat: ${location.coords.latitude.toFixed(6)}, Lon: ${location.coords.longitude.toFixed(6)}`
+      };
+
+      // Créer le signalement via le contexte
+      await createSignalement(signalementData);
+
       setIsLoading(false);
       Alert.alert(
         'Signalement envoyé',
@@ -82,7 +102,14 @@ export default function NouveauSignalementScreen() {
           }
         ]
       );
-    }, 2000);
+    } catch (error) {
+      setIsLoading(false);
+      Alert.alert(
+        'Erreur',
+        'Impossible d\'envoyer le signalement. Veuillez réessayer.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   return (

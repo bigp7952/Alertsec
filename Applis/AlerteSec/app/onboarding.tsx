@@ -294,7 +294,6 @@ const styles = StyleSheet.create({
   progressDot: {
     height: 8,
     borderRadius: 4,
-    transition: 'all 0.3s ease',
   },
   content: {
     flex: 1,

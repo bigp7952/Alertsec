@@ -580,7 +580,7 @@ export default function AgentDashboardScreen() {
             <Text style={styles.teamStatLabel}>Actifs</Text>
           </View>
           <View style={styles.teamStat}>
-            <Text style={styles.teamStatValue}>{agentStats?.totalAgents - (agentStats?.activeAgents || 0)}</Text>
+            <Text style={styles.teamStatValue}>{(agentStats?.totalAgents || 0) - (agentStats?.activeAgents || 0)}</Text>
             <Text style={styles.teamStatLabel}>Hors ligne</Text>
           </View>
           <View style={styles.teamStat}>
@@ -1489,12 +1489,6 @@ const styles = StyleSheet.create({
   },
   performanceSection: {
     marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.text,
-    marginBottom: 16,
   },
   performanceGrid: {
     gap: 12,

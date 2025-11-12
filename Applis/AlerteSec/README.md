@@ -1,10 +1,37 @@
-# AlerteSec 🚨
+# 🚨 AlerteSec - Application Mobile
 
 **Sécurité citoyenne en temps réel**
 
-AlerteSec est une application mobile permettant aux citoyens de signaler des dangers en temps réel et aux forces de l'ordre de réagir rapidement. Une interface unique avec des fonctionnalités adaptées selon le rôle (citoyen vs force de l'ordre).
+Application mobile permettant aux citoyens de signaler des dangers en temps réel et aux forces de l'ordre de réagir rapidement. Une interface unique avec des fonctionnalités adaptées selon le rôle (citoyen vs force de l'ordre).
 
-## ✨ Fonctionnalités principales
+## 🚀 Démarrage Rapide
+
+```bash
+# Installation
+npm install
+
+# Lancer l'application
+npx expo start
+```
+
+**Options de lancement** :
+- 📱 **Expo Go** : Scanner le QR code
+- 🤖 **Android** : `npx expo start --android`
+- 🍎 **iOS** : `npx expo start --ios`
+- 🌐 **Web** : `npx expo start --web`
+
+## 🔐 Comptes de Test
+
+**Force de l'ordre :**
+- Matricule: `DEMO`
+- Nom: `DEMO`
+- Mot de passe: `demo123`
+
+**Citoyen :**
+- Email: `citoyen1@alertsec.com`
+- Mot de passe: `password`
+
+## ✨ Fonctionnalités Principales
 
 ### Pour les citoyens
 - **Alerte SOS ultra-rapide** : Signalement en moins de 10 secondes
@@ -22,35 +49,17 @@ AlerteSec est une application mobile permettant aux citoyens de signaler des dan
 - **Algorithme de scoring** : Pondération par gravité et décroissance temporelle
 - **Mise à jour temps réel** : Actualisation continue des niveaux de risque
 
-## 🛠 Technologies utilisées
+## 🛠️ Technologies
 
 - **Expo Router** - Navigation file-based
-- **React Native** - Framework mobile cross-platform  
+- **React Native** - Framework mobile cross-platform
 - **NativeWind (Tailwind CSS)** - Styling moderne et responsive
 - **React Native Maps** - Cartographie interactive
 - **Expo Location** - Géolocalisation précise
 - **React Native Reanimated** - Animations fluides
 - **TypeScript** - Typage statique pour plus de robustesse
 
-## 🚀 Installation et lancement
-
-1. **Installer les dépendances**
-   ```bash
-   npm install
-   ```
-
-2. **Lancer l'application**
-   ```bash
-   npx expo start
-   ```
-
-3. **Options de lancement**
-   - 📱 **Expo Go** : Scanner le QR code
-   - 🤖 **Android** : `npx expo start --android`
-   - 🍎 **iOS** : `npx expo start --ios`
-   - 🌐 **Web** : `npx expo start --web`
-
-## 📱 Guide d'utilisation
+## 📱 Guide d'Utilisation
 
 ### Premier lancement
 1. **SplashScreen animé** (3 secondes)
@@ -65,12 +74,10 @@ AlerteSec est une application mobile permettant aux citoyens de signaler des dan
 4. **Géolocalisation** automatique + confirmation visuelle
 5. **Total < 10 secondes** ⚡
 
-### Comptes de démonstration
+## 📚 Documentation
 
-**Force de l'ordre :**
-- Matricule: `DEMO`
-- Nom: `DEMO`  
-- Mot de passe: `demo123`
+- **[DOCUMENTATION.md](DOCUMENTATION.md)** - Documentation technique complète
+- **[GUIDE.md](GUIDE.md)** - Guide d'authentification et utilisation
 
 ## 🎨 Design System
 
@@ -86,7 +93,7 @@ AlerteSec est une application mobile permettant aux citoyens de signaler des dan
 - `SignalementCard` / `ZoneCard` / `NotificationBadge`
 - Animations : fade, scale, pulse, slide (200-300ms)
 
-## 📂 Structure du projet
+## 📂 Structure du Projet
 
 ```
 app/
@@ -104,10 +111,6 @@ app/
     ├── signalements.tsx    # Mes alertes
     ├── explore.tsx         # Communauté
     └── profile.tsx         # Profil utilisateur
-
-components/ui/
-├── buttons.tsx             # Composants boutons
-└── cards.tsx              # Composants cartes
 ```
 
 ## 🔧 Configuration
@@ -122,7 +125,7 @@ components/ui/
 - Fallback sur Paris (48.8566, 2.3522) si échec
 - Précision élevée pour les signalements
 
-## 📊 Algorithme zones de danger
+## 📊 Algorithme Zones de Danger
 
 ```javascript
 // Calcul du score de danger pour une zone
@@ -136,7 +139,7 @@ weight_timeDecay = exp(-(now - created_at) / T)
 
 // Classification des zones
 score > S_high => Rouge (critique)
-score > S_med  => Orange (surveillée)  
+score > S_med  => Orange (surveillée)
 sinon         => Vert (sûre)
 ```
 
@@ -147,21 +150,6 @@ sinon         => Vert (sûre)
 - **Logs d'accès** : Traçabilité des actions
 - **Masquage** : Numéros partiellement cachés sur l'UI publique
 - **RGPD** : Respect de la vie privée des utilisateurs
-
-## 🤝 Contribution
-
-L'application est conçue pour être facilement extensible :
-
-1. **Backend** : Intégration API REST/GraphQL
-2. **WebSockets** : Notifications temps réel
-3. **Push notifications** : Alertes critiques
-4. **Base de données** : PostgreSQL/MongoDB recommandé
-5. **Analytics** : Suivi des métriques de sécurité
-
-## 📄 Licence
-
-Ce projet est développé dans le cadre d'une démonstration technique.
-Pour un déploiement en production, veuillez consulter les réglementations locales concernant les applications de sécurité publique.
 
 ---
 
